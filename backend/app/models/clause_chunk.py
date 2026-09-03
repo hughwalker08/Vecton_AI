@@ -11,8 +11,8 @@ Embedding: Gemini `text-embedding-004`, 768-dim (settings.EMBEDDING_DIM).
 """
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column, DateTime, Integer, JSON, String, Text
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy import Column, Computed, DateTime, Integer, JSON, String, Text
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.sql import func
 
 from app.core.config import settings
@@ -61,7 +61,13 @@ class ClauseChunk(Base):
     created_at = Column(DateTime, server_default=func.now())
 
     # --- retrieval ---
-    embedding = Column(Vector(settings.EMBEDDING_DIM))  # Gemini text-embedding-004
-
-    # TODO (migration 0003): tsvector column + GIN index on `text` for the
-    # lexical (BM25) half of hybrid retrieval.
+    # Dense: Gemini text-embedding-004. Lexical: Postgres full-text over
+    # heading + text, maintained by the DB (Computed / STORED generated column).
+    embedding = Column(Vector(settings.EMBEDDING_DIM))
+    text_tsv = Column(
+        TSVECTOR,
+        Computed(
+            "to_tsvector('english', coalesce(heading, '') || ' ' || text)",
+            persisted=True,
+        ),
+    )
