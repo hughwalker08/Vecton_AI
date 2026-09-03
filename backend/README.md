@@ -24,8 +24,17 @@ alembic revision --autogenerate -m "msg"   # diff models vs DB (review the outpu
 alembic upgrade head --sql  # print SQL instead of running it
 ```
 
-`0001_initial_schema` installs the `vector` extension and creates
-`clause_chunks` with a 768-dim embedding column + an HNSW cosine index.
+Migrations:
+- `0001_initial_schema` — `vector` extension + `clause_chunks` + HNSW cosine index.
+- `0002_refs_applicability_node_type` — `node_type`; typed refs (`internal_refs`,
+  `standard_refs`); applicability qualifiers (`building_classes`, `jurisdictions`,
+  `climate_zones`, `applicability_note`) with GIN indexes.
+
+Schema covers the client's citation requirements: specific clause id
+(`clause_id`) + containment (`hierarchy`), source document (`doc`), verbatim
+`text`, corpus-internal references vs Australian-Standard hand-offs (split
+columns), and per-class / per-state / per-climate-zone applicability
+(structured for filtering + `applicability_note` verbatim for the answer).
 
 Supabase note: the direct host `db.<ref>.supabase.co` is IPv6-only. If your
 network has no IPv6, use the **Session pooler** connection string
