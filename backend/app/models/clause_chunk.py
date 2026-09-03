@@ -2,14 +2,18 @@
 SQLAlchemy model skeleton for a clause chunk (NCC / ABCB corpus, or a
 parsed user upload). Matches the metadata structure from the planning doc.
 
-Not yet wired to a migration - fields/types are indicative and will need
-the pgvector column type added once the embedding model + dimension are
-decided (BGE-M3 vs Gemini).
+Embedding model is decided: Gemini `text-embedding-004`, 768-dim
+(settings.EMBEDDING_DIM), so the pgvector column dimension is fixed below.
+Still not wired to a migration - add an Alembic migration that also runs
+`CREATE EXTENSION IF NOT EXISTS vector` and creates an ANN index
+(hnsw / ivfflat) on `embedding`.
 """
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Column, String, Text, JSON, DateTime
 from sqlalchemy.sql import func
 
+from app.core.config import settings
 from app.db.session import Base
 
 
@@ -29,5 +33,8 @@ class ClauseChunk(Base):
     retrieved_at = Column(DateTime)
     created_at = Column(DateTime, server_default=func.now())
 
-    # TODO: add pgvector embedding column once embedding model is chosen,
-    # e.g. embedding = Column(Vector(dim)) via the `pgvector.sqlalchemy` type.
+    # Gemini text-embedding-004 output. Dimension must match settings.EMBEDDING_DIM.
+    embedding = Column(Vector(settings.EMBEDDING_DIM))
+
+    # TODO (migration): tsvector column + GIN index on `text` for the BM25 side
+    # of hybrid retrieval, and an hnsw/ivfflat index on `embedding`.

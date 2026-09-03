@@ -3,12 +3,12 @@ uvicorn[standard]>=0.30
 pydantic>=2.8
 pydantic-settings>=2.4
 sqlalchemy>=2.0
+alembic>=1.13
 psycopg2-binary>=2.9
 pgvector>=0.3
 python-docx>=1.1
 python-multipart>=0.0.9
 
-# Uncomment once embedding/LLM provider decisions are finalised:
-# google-generativeai        # Gemini embeddings + generation
-# docling                    # self-hosted PDF parsing
-# llama-parse                # external PDF parsing API (needs client sign-off)
+# Provider decisions (locked in):
+google-generativeai>=0.8      # Gemini embeddings (text-embedding-004) + generation
+llama-parse>=0.5              # external PDF parsing API (client sign-off required)

@@ -3,9 +3,10 @@ Document upload endpoint skeleton.
 
 Intended flow (see planning doc, Part B - User document uploads):
     1. Accept a PDF or DOCX file.
-    2. Parse to text - DOCX via python-docx, PDF via Docling or LlamaParse
-       (provider chosen by settings.PDF_PARSER).
-    3. Chunk and embed the same way as the ingested NCC/ABCB corpus.
+    2. Parse to text - DOCX via python-docx, PDF via LlamaParse
+       (settings.PDF_PARSER = "llamaparse", settings.LLAMAPARSE_API_KEY).
+    3. Chunk and embed (Gemini text-embedding-004) the same way as the
+       ingested NCC/ABCB corpus.
     4. Analyse against applicable provisions, producing categorised findings.
 
 None of this is implemented yet - just the route shape and schema.

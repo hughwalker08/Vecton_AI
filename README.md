@@ -9,6 +9,9 @@ build directly on top of it.
 - **Frontend:** React (Vite)
 - **Backend:** FastAPI
 - **Database:** Postgres + pgvector (via Supabase)
+- **Embeddings:** Gemini `text-embedding-004` (768-dim)
+- **Generation (LLM):** Gemini
+- **PDF parsing:** LlamaParse (external API — client sign-off required)
 - **Hosting:** Render
 
 ## Structure
@@ -37,10 +40,10 @@ npm run dev
 ## Roadmap (per current planning doc)
 
 - [ ] Parse NCC/ABCB XML corpus into clause-level chunks with metadata
-- [ ] Decide embedding model (BGE-M3 vs Gemini) and wire up `services/embedding.py`
+- [x] Decide embedding model — **Gemini `text-embedding-004`** (768-dim); wire up `services/embedding.py`
 - [ ] Build hybrid retrieval (vector + BM25 + RRF) and reranker
 - [ ] Wire chat endpoint to retrieval + generation, with citations/abstention
-- [ ] Decide PDF parser (Docling vs LlamaParse) and implement upload pipeline
+- [x] Decide PDF parser — **LlamaParse**; implement upload pipeline
 - [ ] Document-to-requirement analysis (findings: missing / contradicted / addressed / needs review)
 - [ ] Frontend: chat UI with citation view, upload UI with findings display
 - [ ] Deploy to Render
