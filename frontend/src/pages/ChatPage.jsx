@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { askQuestion } from '../api/client.js'
 import './ChatPage.css'
 
 export default function ChatPage() {
   const [question, setQuestion] = useState('')
-
+  const [isLoading, setIsLoading] = useState(false)
+  const [citations, setCitations] = useState([])
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -12,7 +14,7 @@ export default function ChatPage() {
     },
   ])
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault()
 
     const trimmedQuestion = question.trim()
@@ -33,6 +35,39 @@ export default function ChatPage() {
     ])
 
     setQuestion('')
+    setIsLoading(true)
+
+    try {
+      const response = await askQuestion(trimmedQuestion)
+
+      const assistantMessage = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        text: response.answer,
+      }
+
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        assistantMessage,
+      ])
+
+      setCitations(response.citations ?? [])
+    } catch (error) {
+      const errorMessage = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        text: 'Unable to contact the backend. Please try again.',
+      }
+
+      setMessages((currentMessages) => [
+        ...currentMessages,
+        errorMessage,
+      ])
+
+      console.error(error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -68,6 +103,13 @@ export default function ChatPage() {
                 <p>{message.text}</p>
               </div>
             ))}
+          
+	    {isLoading && (
+	      <div className="message assistant-message">
+		<span className="message-label">Assistant</span>
+		<p>Thinking...</p>
+	      </div>
+	    )}
           </section>
 
           <aside className="source-panel">
@@ -76,29 +118,52 @@ export default function ChatPage() {
               <p>Supporting NCC references will appear here.</p>
             </div>
 
-             <div className="source-card">
-               <span className="source-type">Source preview</span>
+            {citations.length === 0 ? (
+              <div className="source-card">
+                <span className="source-type">No source</span>
 
-               <h3>NCC reference</h3>
+                <h3>No citations returned</h3>
 
-               <p className="source-clause">
-                 Example clause
-               </p>
+                <p className="source-description">
+                  The current backend did not return any citations.
+                </p>
+              </div>
+            ) : (
+              citations.map((citation, index) => (
+                <div
+                  className="source-card"
+                  key={`${citation.doc}-${citation.clause_id}-${index}`}
+                >
+                  <span className="source-type">
+                    Citation {index + 1}
+                  </span>
 
-               <p className="source-description">
-                 Source content will appear here when retrieval results are connected to the frontend.
-               </p>
+                  <h3>{citation.doc}</h3>
 
-               <button
-                 type="button"
-                 className="source-button"
-               >
-                 View source
-               </button>
-             </div>
+                  <p className="source-clause">
+                    {citation.clause_id}
+                  </p>
+
+                  {citation.source_url ? (
+                    <a
+                      className="source-button"
+                      href={citation.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View source
+                    </a>
+                  ) : (
+                    <p className="source-description">
+                      No source URL available.
+                    </p>
+                  )}
+                </div>
+              ))
+            )}
+
           </aside>
         </div>
-
         <form
           className="chat-input-area"
           onSubmit={handleSubmit}
@@ -109,13 +174,14 @@ export default function ChatPage() {
             aria-label="Construction compliance question"
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
+	    disabled={isLoading}
           />
 
           <button
             type="submit"
-            disabled={!question.trim()}
+            disabled={isLoading || !question.trim()}
           >
-            Send
+            {isLoading ? 'Sending...' : 'Send'}
           </button>
         </form>
       </section>
