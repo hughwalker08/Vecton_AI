@@ -59,16 +59,74 @@ app/
   db/session.py       # SQLAlchemy engine/session (Postgres + pgvector)
   models/             # SQLAlchemy models (clause_chunk.py so far)
   schemas/            # (reserved for shared Pydantic schemas)
-  services/           # embedding.py, retrieval.py, generation.py — all stubs
+  services/           # embedding.py, retrieval.py, generation.py (stubs)
+                      # image_description.py (implemented)
   api/routes/         # health.py, chat.py, upload.py
+scripts/              # describe_images.py — batch NCC/ABCB figure transcription
+data/images/          # drop NCC/ABCB figures here (gitignored)
+data/image_descriptions/  # generated descriptions (gitignored)
 migrations/           # Alembic: env.py + versions/ (0001 = initial schema)
 alembic.ini           # Alembic config (DB URL comes from .env, not here)
 ```
+
+## Image / diagram transcription
+
+NCC and ABCB figures carry requirements that exist nowhere in the clause text
+(riser heights, flashing details, decision trees). `scripts/describe_images.py`
+sends each image to Gemini and writes a text description keyed by the image
+path, so figures can be embedded and cited like any other chunk.
+
+```bash
+cd backend
+pip install -r requirements.txt
+cp .env.example .env          # set GEMINI_API_KEY
+
+# drop the figures into data/images/ (sub-folders encouraged), then:
+python scripts/describe_images.py
+
+# or point it at any folder(s) - searched recursively
+python scripts/describe_images.py path/to/ncc_vol2 path/to/housing_provisions
+
+python scripts/describe_images.py data/images --dry-run       # cost nothing, just list
+python scripts/describe_images.py data/images --limit 5        # trial run
+python scripts/describe_images.py data/images --model gemini-2.5-pro --workers 4
+```
+
+Output (default `data/image_descriptions/`):
+
+| file | contents |
+| --- | --- |
+| `descriptions.jsonl` | one JSON record per image, written as each finishes: `image`, `file_name`, `description`, `model`, `prompt_version`, `chars`, `attempts`, `seconds`, `described_at` |
+| `descriptions.json` | flat `{"ncc_vol2/part_11/figure_11_2_2.png": "..."}` map, rewritten at the end |
+| `descriptions.errors.jsonl` | images that failed, with the error |
+
+The `image` key is the path *relative to the input folder*, so same-named
+figures in different parts don't collide.
+
+While running it prints `[n/total]`, the image name, size and elapsed time, the
+first few lines of each fresh description, a rate/ETA heartbeat every 10 images,
+and the output paths at the end.
+
+Notes:
+- **Resume is the default** — a re-run skips images already in the output, so an
+  interrupted or rate-limited job just needs the same command again.
+  `--overwrite` re-does everything; `--retry-failed` retries only the failures.
+- Retries use exponential backoff, with a much longer wait on HTTP 429 —
+  free-tier Gemini is roughly 15 requests/min, so leave `--workers` at 1 there.
+- The prompt lives in `app/services/image_description.py` and asks for verbatim
+  transcription of every label, dimension and note rather than a prose summary,
+  with an explicit instruction never to infer a value the figure doesn't show.
+  Bump `PROMPT_VERSION` when editing it — it's recorded on every record, so you
+  can tell which descriptions predate the change.
+- `describe_image()` is importable, so the XML ingestion pipeline can call it
+  directly once figures are matched to clauses.
 
 ## Decisions locked in
 
 - **Embeddings:** Gemini `text-embedding-004` (768-dim) — `services/embedding.py`
 - **Generation:** Gemini — `services/generation.py`
+- **Diagram/image description:** Gemini vision (`VISION_MODEL_NAME`, default
+  `gemini-2.5-flash`) — `services/image_description.py` + `scripts/describe_images.py`
 - **PDF parsing:** LlamaParse (external API; needs client sign-off) — `services/`/`api/routes/upload.py`
 - DOCX parsing stays local via `python-docx`
 

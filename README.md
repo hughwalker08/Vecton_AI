@@ -11,6 +11,7 @@ build directly on top of it.
 - **Database:** Postgres + pgvector (via Supabase)
 - **Embeddings:** Gemini `text-embedding-004` (768-dim)
 - **Generation (LLM):** Gemini
+- **Diagram/image description:** Gemini vision (`gemini-2.5-flash`)
 - **PDF parsing:** LlamaParse (external API — client sign-off required)
 - **Hosting:** Render
 
@@ -40,6 +41,7 @@ npm run dev
 ## Roadmap (per current planning doc)
 
 - [ ] Parse NCC/ABCB XML corpus into clause-level chunks with metadata
+- [x] Transcribe NCC/ABCB diagrams to text — `backend/scripts/describe_images.py`
 - [x] Decide embedding model — **Gemini `text-embedding-004`** (768-dim); wire up `services/embedding.py`
 - [ ] Build hybrid retrieval (vector + BM25 + RRF) and reranker
 - [ ] Wire chat endpoint to retrieval + generation, with citations/abstention
