@@ -18,8 +18,3 @@ dist/
 .idea/
 .DS_Store
 
-# NCC/ABCB source images and their generated descriptions
-backend/data/images/**
-!backend/data/images/README.md
-backend/data/image_descriptions/*.jsonl
-backend/data/image_descriptions/*.json
