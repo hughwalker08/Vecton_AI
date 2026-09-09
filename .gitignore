@@ -17,7 +17,4 @@ dist/
 .vscode/
 .idea/
 .DS_Store
-ncc-2025-housing-provisions-v1.2/*
-ncc-2025-volume-two-v1.2/*
-# Ingest pipeline output (generated, re-run to regenerate)
-backend/app/ingest/output/
+

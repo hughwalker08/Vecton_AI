@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "gemini"
     GEMINI_API_KEY: str = ""
 
+    # --- Vision model for describing NCC/ABCB diagrams and figures ---
+    # Used by services/image_description.py and scripts/describe_images.py.
+    # Shares GEMINI_API_KEY above.
+    VISION_MODEL_NAME: str = "gemini-2.5-flash"
+
     # --- Document parsing for user uploads ---
     # Decided: "llamaparse" for PDF (external API - needs client sign-off).
     # DOCX is parsed locally via python-docx regardless of this setting.
