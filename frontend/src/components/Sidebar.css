@@ -155,6 +155,7 @@
     left: 0;
     width: 260px;
     min-width: 260px;
+    padding-top: 60px;
     height: 100vh;
     transform: translateX(-100%);
     transition: transform 0.25s ease;

@@ -12,6 +12,10 @@ export default function Sidebar() {
   const { chatId: activeChatId } = useParams()
   const [isOpen, setIsOpen] = useState(false)
 
+  function toggleMenu() {
+    setIsOpen(!isOpen)
+  }
+
   function closeMenu() {
     setIsOpen(false)
   }
@@ -20,7 +24,7 @@ export default function Sidebar() {
     <>
       <button
         className="sidebar-toggle"
-        onClick={() => setIsOpen(true)}
+        onClick={toggleMenu}
         aria-label="Open menu"
         aria-expanded={isOpen}
       >
