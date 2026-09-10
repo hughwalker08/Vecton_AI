@@ -21,5 +21,7 @@ dist/
 ncc-2025-volume-two-v1.2/*
 ncc-2025-housing-provisions-v1.2/*
 
-# embed_chunks.py resume state (the merged *.embedded.json is the real output)
-backend/app/ingest/output/embeddings/
+# embed_chunks.py resume state. The big append-only log is local-only; the
+# merged *.embedded.json is the real, shared output and .meta.json (tiny) is
+# committed so everyone embeds with identical settings.
+backend/app/ingest/output/embeddings/*.jsonl

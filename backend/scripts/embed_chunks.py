@@ -293,6 +293,35 @@ def load_done(progress_path: Path) -> dict[str, list[float]]:
     return done
 
 
+def load_done_from_embedded(out_path: Path, args) -> dict[str, list[float]]:
+    """chunk id -> vector, recovered from a shared <name>.embedded.json.
+
+    The .embedded.json is what gets committed and passed between team members;
+    the .jsonl progress log is local and gitignored. So on a fresh clone this is
+    the only record of what has already been embedded -- without it the script
+    would re-embed (and re-pay for) every chunk.
+    """
+    done: dict[str, list[float]] = {}
+    if not out_path.exists():
+        return done
+    chunks = json.loads(out_path.read_text(encoding="utf-8"))
+    for chunk in chunks:
+        vec = chunk.get("embedding")
+        if not vec:
+            continue
+        model = chunk.get("embedding_model")
+        edim = chunk.get("embedding_dim")
+        if (model and model != args.model) or (edim and edim != args.dim):
+            raise SystemExit(
+                f"{out_path.name} already holds {model} @ {edim}-dim vectors, but you "
+                f"asked for {args.model} @ {args.dim}. Use matching settings, or delete "
+                f"{out_path.name} (and output/embeddings/{out_path.stem.replace('.embedded','')}.*) "
+                f"to start over."
+            )
+        done[chunk["id"]] = vec
+    return done
+
+
 def content_for(chunk: dict, with_heading: bool) -> str:
     text = chunk.get("text") or ""
     heading = chunk.get("heading") or ""
@@ -334,6 +363,20 @@ def process_file(input_path: Path, args, keyring: KeyRing, limiter: RateLimiter)
     chunks = json.loads(input_path.read_text(encoding="utf-8"))
     done = load_done(progress_path)
 
+    # Recover progress from a shared .embedded.json (see load_done_from_embedded).
+    from_shared = load_done_from_embedded(out_path, args)
+    recovered = 0
+    if from_shared and not args.dry_run:
+        with progress_path.open("a", encoding="utf-8") as fh:
+            for cid, vec in from_shared.items():
+                if cid not in done:
+                    done[cid] = vec
+                    fh.write(json.dumps({"id": cid, "embedding": vec}) + "\n")
+                    recovered += 1
+    else:
+        for cid, vec in from_shared.items():
+            done.setdefault(cid, vec)
+
     todo = [c for c in chunks
             if c.get("id") not in done and content_for(c, args.with_heading).strip()]
     skipped_empty = sum(1 for c in chunks if not content_for(c, args.with_heading).strip())
@@ -342,7 +385,8 @@ def process_file(input_path: Path, args, keyring: KeyRing, limiter: RateLimiter)
     print()
     print(bold(f"{input_path.name}"))
     print(f"  chunks        : {len(chunks)}")
-    print(f"  already done  : {len(done)}")
+    print(f"  already done  : {len(done)}"
+          + (dim(f"  ({recovered} recovered from {out_path.name})") if recovered else ""))
     if skipped_empty:
         print(f"  no text       : {skipped_empty}  (skipped)")
     if args.limit is not None:
