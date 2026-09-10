@@ -15,11 +15,13 @@ input {
 }
 
 .chat-page {
-  min-height: calc(100vh - 60px);
   padding: 32px;
+  height: 100%;
+  min-height: 100vh;
 }
 
 .chat-container {
+  height: 100%;
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
@@ -28,6 +30,29 @@ input {
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 64px); /* fix the whole widget's height */
+}
+
+
+.chat-content {
+  flex: 1;
+  min-height: 0; /* required for children to be allowed to scroll in a flex/grid parent */
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+}
+
+.conversation-panel {
+  overflow-y: auto; /* scrolls internally, input stays put below */
+}
+
+.source-panel {
+  overflow-y: auto; /* only kicks in if citations list ever gets long */
+}
+
+.chat-input-area {
+  flex-shrink: 0; /* never gets squeezed or pushed off */
 }
 
 .chat-header {
@@ -55,12 +80,6 @@ input {
   line-height: 1.5;
 }
 
-.chat-content {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
-  min-height: 480px;
-}
-
 .conversation-panel {
   display: flex;
   flex-direction: column;
@@ -77,8 +96,10 @@ input {
 }
 
 .assistant-message {
+  max-width: 100%;
+  padding-bottom: 16px;
   align-self: flex-start;
-  background: #f3f4f6;
+  background: transparent;
 }
 
 .user-message {
@@ -225,7 +246,7 @@ input {
   cursor: not-allowed;
 }
 
-@media (max-width: 800px) {
+@media (max-width: 768px) {
   .chat-page {
     padding: 16px;
   }
@@ -235,9 +256,13 @@ input {
   }
 
   .conversation-panel {
-    min-height: 320px;
+    height: 50vh;
     border-right: 0;
     border-bottom: 1px solid #e5e7eb;
+  }
+
+  .source-panel {
+    max-height: 300px;
   }
 
   .message {
@@ -246,5 +271,14 @@ input {
 
   .chat-input-area {
     padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-page {
+    padding: 4px;
+  }
+  .chat-input-area input {
+    font-size: 12px;
   }
 }
