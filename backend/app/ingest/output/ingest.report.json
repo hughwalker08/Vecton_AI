@@ -1,0 +1,137 @@
+{
+  "corpora": {
+    "vol2": {
+      "doc_label": "NCC 2025 Volume Two",
+      "chunks_by_node_type": {
+        "figure": 33,
+        "glossary": 493,
+        "note": 180,
+        "part": 21,
+        "specification": 5,
+        "subclause": 509,
+        "table": 45
+      },
+      "clauses_total": 232
+    },
+    "housing": {
+      "doc_label": "ABCB Housing Provisions",
+      "chunks_by_node_type": {
+        "figure": 247,
+        "glossary": 493,
+        "note": 233,
+        "part": 64,
+        "subclause": 725,
+        "table": 248
+      },
+      "clauses_total": 297
+    }
+  },
+  "images_matched": 280,
+  "images_unmatched": [],
+  "standards_matched": 440,
+  "standards_unmatched": [
+    "AS 1170.1",
+    "AS 1170.4",
+    "AS 1428.1",
+    "AS 1530 Part 8",
+    "AS 1530.1",
+    "AS 1530.2",
+    "AS 1530.3",
+    "AS 1530.4",
+    "AS 1546",
+    "AS 1562.1",
+    "AS 1562.3",
+    "AS 1603.3",
+    "AS 1668.2",
+    "AS 1668.4",
+    "AS 1670.1",
+    "AS 1684",
+    "AS 1684.2",
+    "AS 1684.3",
+    "AS 1684.4",
+    "AS 1720",
+    "AS 1720.1",
+    "AS 1720.4",
+    "AS 1720.5",
+    "AS 1860.2",
+    "AS 1926.1",
+    "AS 1926.2",
+    "AS 1926.3",
+    "AS 2312.1",
+    "AS 2312.2",
+    "AS 2699.1",
+    "AS 2699.3",
+    "AS 3660.1",
+    "AS 3660.3",
+    "AS 4072.1",
+    "AS 4200.1",
+    "AS 4200.2",
+    "AS 4254",
+    "AS 4254.1",
+    "AS 4254.2",
+    "AS 4654",
+    "AS 4654.1",
+    "AS 4654.2",
+    "AS 4773",
+    "AS 4773.1",
+    "AS 4773.2",
+    "AS 5146.1",
+    "AS 5348",
+    "AS 5637.1",
+    "AS/NZS 1170",
+    "AS/NZS 1170.0",
+    "AS/NZS 1170.1",
+    "AS/NZS 1170.2",
+    "AS/NZS 1170.3",
+    "AS/NZS 1428 Part 4",
+    "AS/NZS 1530 Part 1",
+    "AS/NZS 1530.3",
+    "AS/NZS 1546",
+    "AS/NZS 1546.1",
+    "AS/NZS 1664.1",
+    "AS/NZS 1664.2",
+    "AS/NZS 1680.0",
+    "AS/NZS 1859.4",
+    "AS/NZS 2179.1",
+    "AS/NZS 2269.0",
+    "AS/NZS 2908.2",
+    "AS/NZS 3500",
+    "AS/NZS 3500.0",
+    "AS/NZS 3500.2",
+    "AS/NZS 3500.3",
+    "AS/NZS 4859.1",
+    "AS/NZS 4859.2",
+    "AS/NZS 5601",
+    "AS/NZS 5601.1"
+  ],
+  "internal_refs_resolved": 1239,
+  "internal_refs_unresolved": 23,
+  "external_refs_by_kind": {
+    "standard": {
+      "total": 688,
+      "resolved": 0
+    },
+    "vol1": {
+      "total": 61,
+      "resolved": 0
+    },
+    "housing": {
+      "total": 262,
+      "resolved": 206
+    },
+    "vol3": {
+      "total": 11,
+      "resolved": 0
+    },
+    "livable": {
+      "total": 16,
+      "resolved": 0
+    },
+    "vol2": {
+      "total": 153,
+      "resolved": 153
+    }
+  },
+  "housing_bare_citations_found": 126,
+  "housing_bare_citations_resolved": 70
+}
