@@ -13,3 +13,11 @@ lxml>=5.0
 # Provider decisions (locked in):
 google-generativeai>=0.8      # Gemini embeddings (text-embedding-004) + generation
 llama-parse>=0.5              # external PDF parsing API (client sign-off required)
+
+# PyMuPDF does double duty: it extracts embedded images from uploaded PDFs
+# (app/services/document_images.py) and rasterises the NCC/ABCB corpus's SVG
+# figures to PNG so a vision model can read them. Chosen over cairosvg and
+# svglib/reportlab because it needs no native cairo build, which is the
+# difference between "pip install" working and not working on Windows.
+# cairosvg is used instead when present, but is not required.
+pymupdf>=1.24
