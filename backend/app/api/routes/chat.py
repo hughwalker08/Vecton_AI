@@ -12,14 +12,29 @@ Intended flow (see planning doc, Part C - Query time):
 None of this is implemented yet - just the route shape and schema.
 """
 
+from typing import Literal
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
 router = APIRouter()
 
 
+Jurisdiction = Literal[
+    "ACT",
+    "NSW",
+    "NT",
+    "QLD",
+    "SA",
+    "TAS",
+    "VIC",
+    "WA",
+]
+
+
 class ChatRequest(BaseModel):
     question: str
+    jurisdiction: Jurisdiction
 
 
 class Citation(BaseModel):
@@ -38,7 +53,10 @@ class ChatResponse(BaseModel):
 def ask_question(request: ChatRequest) -> ChatResponse:
     """Placeholder - not yet wired up to retrieval or generation."""
     return ChatResponse(
-        answer="Not implemented yet.",
+        answer=(
+            f"Jurisdiction received: {request.jurisdiction}. "
+            "Retrieval is not implemented yet."
+        ),
         citations=[],
         abstained=True,
     )

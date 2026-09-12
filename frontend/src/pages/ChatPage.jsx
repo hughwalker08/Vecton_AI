@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { askQuestion } from '../api/client.js'
 import './ChatPage.css'
 
-export default function ChatPage() {
+export default function ChatPage({ jurisdiction }) {
   const [question, setQuestion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [citations, setCitations] = useState([])
@@ -32,7 +32,10 @@ export default function ChatPage() {
     setIsLoading(true)
 
     try {
-      const response = await askQuestion(trimmedQuestion)
+      const response = await askQuestion(
+	trimmedQuestion,
+	jurisdiction,
+      )
 
       const assistantMessage = {
         id: Date.now() + 1,
