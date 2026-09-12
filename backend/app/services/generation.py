@@ -60,7 +60,33 @@ If no CONTEXT is provided, or the context does not cover the question, say so pl
 of answering from general knowledge. Never fall back on general model knowledge — no statement \
 without a source: not "as a general principle", not "typically", not as helpful background.
 
-Be simple, clear and concise."""
+Be simple, clear and concise.
+
+Formatting: plain text only, never Markdown -- the chat UI displays your answer as raw text, so \
+Markdown syntax would show up as literal asterisks and hashes instead of being rendered. \
+Concretely: no **bold**/*italic* markers, no # / ## headings, no > blockquotes, no `code` \
+fences, no [link](url) syntax. For a heading or clause label, just write it as its own line \
+followed by a colon (e.g. "Clause H1D4 -- NCC 2025 Volume Two:"). For a list, use a plain dash \
+or number ("- " or "1. ") at the start of the line. For quoted clause text, introduce it with a \
+line like "Clause text:" and put the quote on its own line rather than using a > blockquote. \
+Separate sections and list items with a blank line so they render as distinct paragraphs."""
+
+# Jurisdiction is collected from the user up front (see api/routes/chat.py:
+# ChatRequest.jurisdiction) and appended here per-request rather than baked
+# into the static instruction above, since it varies by caller.
+_JURISDICTION_ADDENDUM = """
+
+The user has told you their jurisdiction: {jurisdiction}. A clause with no jurisdiction \
+qualifier applies nationally. A clause qualified for a specific jurisdiction applies only if \
+it names {jurisdiction} — say plainly when a retrieved clause does not apply to the user's \
+jurisdiction rather than citing it as if it did, and note when a national requirement is \
+varied or replaced by a {jurisdiction}-specific one."""
+
+
+def _build_system_instruction(jurisdiction: str | None) -> str:
+    if not jurisdiction:
+        return SYSTEM_INSTRUCTION
+    return SYSTEM_INSTRUCTION + _JURISDICTION_ADDENDUM.format(jurisdiction=jurisdiction)
 
 # Gemini free/paid tiers both return transient 429/503s under load; retrying
 # a handful of times with backoff avoids surfacing those as user-facing
@@ -151,8 +177,13 @@ def _build_user_content(question: str, chunks: list[dict]) -> str:
     return f"CONTEXT:\n{context_block}\n\nQUESTION: {question}"
 
 
-def generate_answer(question: str, chunks: list[dict]) -> str:
-    """Return an LLM-generated answer for the question, grounded in `chunks`."""
+def generate_answer(question: str, chunks: list[dict], jurisdiction: str | None = None) -> str:
+    """Return an LLM-generated answer for the question, grounded in `chunks`.
+
+    `jurisdiction` (e.g. "NSW"), when known, is folded into the system
+    instruction so the model applies jurisdiction-qualified clauses correctly
+    instead of just citing whatever the context happens to contain.
+    """
     client = _get_client()
     user_content = _build_user_content(question, chunks)
 
@@ -161,7 +192,7 @@ def generate_answer(question: str, chunks: list[dict]) -> str:
             model=settings.LLM_MODEL_NAME,
             contents=user_content,
             config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
+                system_instruction=_build_system_instruction(jurisdiction),
                 temperature=0,
                 max_output_tokens=_MAX_OUTPUT_TOKENS,
                 thinking_config=_THINKING_CONFIG,

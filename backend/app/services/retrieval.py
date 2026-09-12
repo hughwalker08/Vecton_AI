@@ -34,6 +34,8 @@ RRF_K = 60
 # How many fused candidates get passed into the reranker by default.
 RERANK_CANDIDATE_POOL = 30
 
+VALID_JURISDICTIONS = {"ACT", "NSW", "NT", "QLD", "SA", "TAS", "VIC", "WA"}
+
 _HF_ROUTER_URL = "https://router.huggingface.co/hf-inference/models/{model}"
 
 # BAAI/bge-reranker-base (XLM-RoBERTa-based) caps at 512 tokens for the
@@ -58,11 +60,23 @@ def _to_vector_literal(vec: list[float]) -> str:
     return "[" + ",".join(repr(float(x)) for x in vec) + "]"
 
 
-_SEARCH_SQL = """
+# Jurisdiction routing: a user should see clauses with no jurisdiction
+# restriction (national, jurisdictions IS NULL) plus clauses that explicitly
+# name their jurisdiction -- never clauses restricted to a different one.
+# :jurisdiction is bound to NULL when the caller doesn't filter by it, which
+# short-circuits the whole clause to TRUE (no-op) rather than excluding rows.
+_JURISDICTION_CLAUSE = """
+        AND (
+            :jurisdiction IS NULL
+            OR jurisdictions IS NULL
+            OR :jurisdiction = ANY(jurisdictions)
+        )"""
+
+_SEARCH_SQL = f"""
     WITH dense AS (
         SELECT id, row_number() OVER (ORDER BY embedding <=> :qvec) AS rank
         FROM clause_chunks
-        WHERE embedding IS NOT NULL
+        WHERE embedding IS NOT NULL{_JURISDICTION_CLAUSE}
         ORDER BY embedding <=> :qvec
         LIMIT :pool
     ),
@@ -71,7 +85,7 @@ _SEARCH_SQL = """
             ORDER BY ts_rank_cd(text_tsv, plainto_tsquery('english', :q)) DESC
         ) AS rank
         FROM clause_chunks
-        WHERE text_tsv @@ plainto_tsquery('english', :q)
+        WHERE text_tsv @@ plainto_tsquery('english', :q){_JURISDICTION_CLAUSE}
         ORDER BY ts_rank_cd(text_tsv, plainto_tsquery('english', :q)) DESC
         LIMIT :pool
     ),
@@ -91,50 +105,24 @@ _SEARCH_SQL = """
     LIMIT :top_k
 """
 
-from sqlalchemy import or_
-
-from app.models.clause_chunk import ClauseChunk
-
-VALID_JURISDICTIONS = {
-    "ACT",
-    "NSW",
-    "NT",
-    "QLD",
-    "SA",
-    "TAS",
-    "VIC",
-    "WA",
-}
-
-def jurisdiction_filter(jurisdiction: str):
-    """
-    Return the SQLAlchemy filter for Australian jurisdiction routing.
-
-    A user should receive:
-    - clauses with no jurisdiction restriction (national clauses), OR
-    - clauses that explicitly apply to the user's jurisdiction.
-
-    Clauses specific to other jurisdictions are excluded.
-    """
-    jurisdiction = jurisdiction.upper()
-
-    if jurisdiction not in VALID_JURISDICTIONS:
-        raise ValueError(f"Unsupported jurisdiction: {jurisdiction}")
-
-    return or_(
-        ClauseChunk.jurisdictions.is_(None),
-        ClauseChunk.jurisdictions.any(jurisdiction),
-    )
-
-
-def hybrid_search(query: str, top_k: int = 10) -> list[dict]:
+def hybrid_search(query: str, top_k: int = 10, jurisdiction: str | None = None) -> list[dict]:
     """Return the top_k candidates for `query` via fused dense + lexical search.
+
+    `jurisdiction` (e.g. "NSW"), when given, restricts results to clauses with
+    no jurisdiction restriction plus clauses naming that jurisdiction; clauses
+    scoped to a different jurisdiction are excluded. Omit it to search the
+    whole corpus.
 
     Each result is shaped for app.services.generation._format_chunk (clause_id,
     doc, heading, text, building_classes, jurisdictions, climate_zones,
     applicability_note, standard_refs), plus a `fused_score` for debugging.
     """
     from sqlalchemy import text as sql_text
+
+    if jurisdiction is not None:
+        jurisdiction = jurisdiction.upper()
+        if jurisdiction not in VALID_JURISDICTIONS:
+            raise ValueError(f"Unsupported jurisdiction: {jurisdiction}")
 
     qvec = embed_text(query, task_type="RETRIEVAL_QUERY")
 
@@ -147,6 +135,7 @@ def hybrid_search(query: str, top_k: int = 10) -> list[dict]:
                 "pool": CANDIDATE_POOL,
                 "rrf_k": RRF_K,
                 "top_k": top_k,
+                "jurisdiction": jurisdiction,
             },
         ).mappings().all()
 
@@ -216,7 +205,12 @@ def rerank(query: str, candidates: list[dict], top_n: int = 10) -> list[dict]:
     return scored[:top_n]
 
 
-def retrieve(query: str, top_k: int = 10, candidate_pool: int = RERANK_CANDIDATE_POOL) -> list[dict]:
+def retrieve(
+    query: str,
+    top_k: int = 10,
+    candidate_pool: int = RERANK_CANDIDATE_POOL,
+    jurisdiction: str | None = None,
+) -> list[dict]:
     """Hybrid search, then rerank the pool down to top_k. Main entry point."""
-    candidates = hybrid_search(query, top_k=candidate_pool)
+    candidates = hybrid_search(query, top_k=candidate_pool, jurisdiction=jurisdiction)
     return rerank(query, candidates, top_n=top_k)

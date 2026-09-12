@@ -90,7 +90,7 @@ def ask_question(request: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=400, detail="Question must not be empty.")
 
     try:
-        chunks = retrieve(question, top_k=RETRIEVAL_TOP_K)
+        chunks = retrieve(question, top_k=RETRIEVAL_TOP_K, jurisdiction=request.jurisdiction)
     except (EmbeddingQuotaExceeded, RerankQuotaExceeded) as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
     except (EmbeddingError, RerankError) as exc:
@@ -100,7 +100,7 @@ def ask_question(request: ChatRequest) -> ChatResponse:
         return ChatResponse(answer="No source found.", citations=[], abstained=True)
 
     try:
-        answer = generate_answer(question, chunks)
+        answer = generate_answer(question, chunks, jurisdiction=request.jurisdiction)
     except GenerationQuotaExceeded as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
     except GenerationError as exc:

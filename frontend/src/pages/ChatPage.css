@@ -122,6 +122,10 @@ input {
 
 .message p {
   margin: 0;
+  /* Assistant answers are plain text with real newlines (see generation.py's
+     system prompt -- no Markdown), so preserve them instead of collapsing
+     to one line like default <p> whitespace handling does. */
+  white-space: pre-wrap;
 }
 
 .source-panel {
