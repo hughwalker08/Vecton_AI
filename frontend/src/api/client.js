@@ -3,12 +3,20 @@
 
 const BASE_URL = '/api'
 
-export async function askQuestion(question) {
+export async function askQuestion(question, jurisdiction) {
   const res = await fetch(`${BASE_URL}/chat/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({
+      question,
+      jurisdiction,
+    }),
   })
+
+  if (!res.ok) {
+    throw new Error(`Chat request failed: ${res.status}`)
+  }
+
   return res.json()
 }
 

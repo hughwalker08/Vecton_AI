@@ -1,0 +1,5 @@
+{
+  "model": "gemini-embedding-2",
+  "dim": 768,
+  "with_heading": false
+}
