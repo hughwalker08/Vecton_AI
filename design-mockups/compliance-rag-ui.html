@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vecton AI — NSW construction compliance</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M5 5h7l6 13-3.5 7z' fill='%23F05A22' opacity='.55'/%3E%3Cpath d='M20 5h7L16 29h-6z' fill='%23F05A22'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..600&family=Figtree:wght@300..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FFFFFF;
+  --surface:#FFFFFF;
+  --surface-2:#FAF9F7;
+  --hover:#F4F2EE;
+  --ink:#1B1A18;
+  --ink-2:#4B4741;
+  --muted:#8D8880;
+  --rule:#E6E3DD;
+  --rule-soft:#F0EDE7;
+  --accent:#F05A22;
+  --accent-soft:rgba(240,90,34,.10);
+  --accent-mid:rgba(240,90,34,.22);
+  --shadow-lift:0 1px 2px rgba(27,26,24,.05), 0 12px 32px -12px rgba(27,26,24,.16);
+  --shadow-page:0 1px 3px rgba(27,26,24,.06), 0 24px 48px -28px rgba(27,26,24,.30);
+  color-scheme:light;
+  --sans:"Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif:"Newsreader", Georgia, "Times New Roman", serif;
+  --nav-w:268px;
+  --src-w:440px;
+}
+
+*{box-sizing:border-box;}
+[hidden]{display:none !important;}
+html,body{height:100%;}
+body{
+  margin:0;
+  background:#FFFFFF;
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px;}
+::selection{background:var(--accent-mid);}
+
+/* ---------- shell ---------- */
+.app{
+  display:grid;
+  grid-template-columns:var(--nav-w) minmax(0,1fr) 0px;
+  height:100dvh;
+  transition:grid-template-columns .34s cubic-bezier(.22,.61,.36,1);
+}
+.app[data-source="open"]{grid-template-columns:var(--nav-w) minmax(0,1fr) var(--src-w);}
+
+/* scrim sits outside grid flow at every width so it never steals a column */
+.scrim{
+  position:fixed;inset:0;z-index:35;background:rgba(27,26,24,.35);
+  opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.scrim.on{opacity:1;pointer-events:auto;}
+
+/* ---------- navigator ---------- */
+.nav{
+  border-right:1px solid var(--rule);
+  display:flex;flex-direction:column;min-height:0;
+  background:var(--surface-2);
+}
+.nav-head{padding:20px 18px 12px;}
+.brand{display:flex;align-items:center;gap:9px;margin-bottom:18px;}
+.mark{width:23px;height:23px;flex:none;}
+.brand b{font-weight:800;font-size:18px;letter-spacing:-.02em;color:var(--ink);}
+.brand b span{color:var(--accent);}
+.project{
+  width:100%;text-align:left;border:1px solid var(--rule);border-radius:10px;
+  background:var(--surface);padding:9px 11px;display:flex;align-items:center;gap:10px;
+  transition:border-color .15s;
+}
+.project:hover{border-color:var(--ink-2);}
+.project .p-name{font-size:13.5px;font-weight:600;letter-spacing:-.01em;line-height:1.25;}
+.project .p-meta{font-size:11.5px;color:var(--muted);}
+.project svg{margin-left:auto;flex:none;color:var(--muted);}
+
+.tree{flex:1;min-height:0;overflow-y:auto;padding:6px 10px 90px;}
+.tree-label{
+  font-size:11.5px;color:var(--muted);letter-spacing:.02em;
+  padding:14px 8px 6px;
+}
+.row{
+  width:100%;display:flex;align-items:center;gap:7px;
+  padding:6px 8px;border-radius:8px;text-align:left;
+  color:var(--ink-2);font-size:13.5px;line-height:1.3;
+  transition:background .12s,color .12s;
+}
+.row:hover{background:var(--hover);color:var(--ink);}
+.row[aria-current="true"]{background:var(--accent-soft);color:var(--ink);font-weight:600;}
+.row[aria-current="true"] .ico{color:var(--accent);}
+.row .ico{flex:none;color:var(--muted);}
+.row .caret{flex:none;color:var(--muted);transition:transform .2s ease;}
+.row[aria-expanded="true"] .caret{transform:rotate(90deg);}
+.row .lbl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.row .cnt{margin-left:auto;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;}
+.kids{margin:1px 0 3px 15px;padding-left:9px;border-left:1px solid var(--rule);display:none;}
+.kids.open{display:block;}
+.kids .row{font-size:13px;}
+
+.nav-foot{
+  border-top:1px solid var(--rule);padding:10px 14px;
+  display:flex;align-items:center;gap:10px;background:var(--surface-2);
+}
+.avatar{
+  width:28px;height:28px;border-radius:50%;flex:none;
+  background:var(--ink);color:var(--paper);
+  display:grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.02em;
+}
+.nav-foot .who{font-size:12.5px;font-weight:600;line-height:1.2;}
+.nav-foot .role{font-size:11.5px;color:var(--muted);}
+
+/* ---------- stage ---------- */
+.stage{position:relative;min-width:0;display:flex;flex-direction:column;overflow:hidden;}
+.stage-top{
+  height:56px;flex:none;display:flex;align-items:center;gap:10px;
+  padding:0 22px;border-bottom:1px solid transparent;
+  transition:border-color .2s, background .2s;
+}
+.stage.scrolled .stage-top{border-color:var(--rule);background:color-mix(in srgb, var(--paper) 88%, transparent);backdrop-filter:blur(8px);}
+.crumb{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:7px;min-width:0;}
+.crumb b{color:var(--ink-2);font-weight:600;}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:6px;}
+.ghost{
+  font-size:13px;color:var(--ink-2);padding:6px 11px;border-radius:8px;
+  display:flex;align-items:center;gap:6px;transition:background .12s;
+}
+.ghost:hover{background:var(--hover);}
+.menu-btn{display:none;}
+
+.scroll{flex:1;min-height:0;overflow-y:auto;padding:0 22px 180px;}
+.pane{max-width:820px;margin:0 auto;}
+
+/* ---------- library ---------- */
+.lib-head{padding:26px 0 0;}
+h1{
+  font-family:var(--serif);font-weight:500;font-size:clamp(30px,4vw,40px);
+  letter-spacing:-.02em;margin:0;line-height:1.08;
+}
+.sub{color:var(--muted);font-size:13.5px;margin-top:7px;}
+.counts{display:flex;gap:26px;margin:22px 0 10px;flex-wrap:wrap;}
+.count b{font-family:var(--serif);font-weight:500;font-size:26px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;}
+.count span{font-size:12.5px;color:var(--muted);margin-left:6px;}
+
+.list{margin-top:8px;}
+.item{
+  width:100%;display:flex;align-items:center;gap:13px;
+  padding:13px 12px;border-radius:10px;text-align:left;
+  border-bottom:1px solid var(--rule-soft);
+  transition:background .12s;
+}
+.item:hover{background:var(--hover);}
+.item .ico{flex:none;color:var(--muted);}
+.item:hover .ico{color:var(--accent);}
+.item .body{min-width:0;flex:1;display:flex;flex-direction:column;}
+.item .nm{font-size:14px;font-weight:600;letter-spacing:-.005em;}
+.item .mt{font-size:12px;color:var(--muted);margin-top:2px;}
+.item .owner{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);flex:none;}
+.chip-av{
+  width:22px;height:22px;border-radius:50%;background:var(--rule);
+  display:grid;place-items:center;font-size:9.5px;font-weight:700;color:var(--ink-2);
+}
+.item .when{font-size:12.5px;color:var(--muted);width:108px;text-align:right;flex:none;}
+@media (max-width:820px){.item .owner,.item .when{display:none;}}
+.item.newf{cursor:default;}
+.item.newf:hover{background:none;}
+.item.newf .ico{color:var(--accent);}
+.item.newf input{
+  flex:1;min-width:0;border:none;background:none;outline:none;
+  font-family:var(--sans);font-size:14px;font-weight:600;color:var(--ink);
+  padding:3px 0;border-bottom:1.5px solid var(--accent);
+}
+.item.newf input::placeholder{color:var(--muted);font-weight:400;}
+
+
+/* ---------- thread ---------- */
+.thread{padding-top:26px;}
+.ask{
+  display:inline-block;background:var(--ink);color:var(--paper);
+  padding:11px 17px;border-radius:14px;font-size:14.5px;font-weight:500;
+  letter-spacing:-.005em;max-width:90%;
+}
+.scope-tag{
+  display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);
+  border:1px solid var(--rule);border-radius:7px;padding:3px 8px;margin-bottom:10px;
+}
+.thought{
+  display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);
+  margin:22px 0 12px;
+}
+.answer{font-size:15.5px;line-height:1.62;color:var(--ink-2);}
+.answer strong{color:var(--ink);font-weight:700;}
+.answer p{margin:0 0 14px;}
+.lead{
+  font-family:var(--serif);font-size:29px;line-height:1.2;font-weight:500;
+  color:var(--ink);letter-spacing:-.02em;margin:0 0 12px;
+}
+.cite{
+  display:inline-grid;place-items:center;min-width:17px;height:17px;padding:0 4px;
+  border-radius:5px;background:var(--accent-soft);color:var(--accent);
+  font-size:10.5px;font-weight:700;vertical-align:2px;margin-left:3px;
+  transition:background .14s;
+}
+.cite:hover,.cite[data-active="true"]{background:var(--accent);color:#fff;}
+
+.flag{
+  border:1px solid var(--rule);border-left:3px solid var(--accent);
+  border-radius:4px 10px 10px 4px;background:var(--surface);
+  padding:14px 16px;margin:20px 0;
+}
+.flag h4{
+  margin:0 0 6px;font-size:13.5px;font-weight:700;letter-spacing:-.005em;color:var(--ink);
+  display:flex;align-items:center;gap:7px;
+}
+.flag p{margin:0;font-size:13.5px;line-height:1.55;color:var(--ink-2);}
+
+.foot{border-top:1px solid var(--rule);margin-top:24px;padding-top:14px;}
+.foot .scope-line{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+.srcs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:11px;}
+.srcs .k{font-size:11.5px;color:var(--muted);}
+.src-chip{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid var(--rule);
+  border-radius:8px;padding:5px 10px;font-size:12.5px;color:var(--ink-2);
+  background:var(--surface);transition:border-color .14s;
+}
+.src-chip:hover{border-color:var(--accent);color:var(--ink);}
+.src-chip i{
+  font-style:normal;font-weight:700;font-size:10.5px;color:var(--accent);
+}
+
+/* ---------- composer ---------- */
+.composer{
+  position:absolute;left:0;right:0;bottom:0;padding:0 22px 22px;
+  background:linear-gradient(to top, var(--paper) 58%, transparent);
+  pointer-events:none;
+}
+.composer-in{
+  max-width:820px;margin:0 auto;pointer-events:auto;
+  background:var(--surface);border:1px solid var(--accent-mid);
+  border-radius:16px;box-shadow:var(--shadow-lift);
+  padding:11px 12px 9px;
+}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+.chip{
+  display:inline-flex;align-items:center;gap:6px;font-size:12px;
+  border:1px solid var(--rule);border-radius:7px;padding:3px 4px 3px 8px;color:var(--ink-2);
+}
+.chip .x{color:var(--muted);padding:0 3px;border-radius:4px;line-height:1;font-size:14px;}
+.chip .x:hover{color:var(--accent);}
+#field{
+  width:100%;border:none;background:none;resize:none;outline:none;
+  font-family:var(--sans);font-size:15px;color:var(--ink);line-height:1.45;
+  padding:5px 4px 8px;max-height:120px;
+}
+#field::placeholder{color:var(--muted);}
+.tools{display:flex;align-items:center;gap:8px;}
+.tool{
+  display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);
+  border:1px solid var(--rule);border-radius:8px;padding:4px 9px;transition:color .14s,border-color .14s;
+}
+.tool:hover{color:var(--ink);border-color:var(--ink-2);}
+.tool.locked{border-style:dashed;}
+.send{
+  margin-left:auto;width:32px;height:32px;border-radius:50%;flex:none;
+  background:var(--accent);color:#fff;display:grid;place-items:center;
+  transition:transform .14s, filter .14s;
+}
+.send:hover{filter:brightness(1.06);transform:scale(1.04);}
+
+/* ---------- source panel ---------- */
+.source{
+  border-left:1px solid var(--rule);background:var(--surface-2);
+  overflow:hidden;display:flex;flex-direction:column;min-width:0;
+}
+.src-top{
+  height:56px;flex:none;display:flex;align-items:center;gap:9px;
+  padding:0 16px;border-bottom:1px solid var(--rule);
+}
+.src-top .back{color:var(--muted);padding:5px;border-radius:7px;flex:none;}
+.src-top .back:hover{background:var(--hover);color:var(--ink);}
+.src-title{font-size:13px;font-weight:600;letter-spacing:-.005em;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pager{margin-left:auto;font-size:12px;color:var(--muted);flex:none;font-variant-numeric:tabular-nums;}
+.src-scroll{flex:1;min-height:0;overflow-y:auto;padding:22px 20px 28px;}
+.page{
+  background:var(--surface);border:1px solid var(--rule);border-radius:8px;
+  box-shadow:var(--shadow-page);padding:26px 26px 30px;
+}
+.clause-no{
+  font-family:var(--serif);font-size:17px;font-weight:600;font-style:italic;
+  letter-spacing:-.01em;margin:0 0 3px;color:var(--ink);
+}
+.clause-ttl{
+  font-family:var(--serif);font-size:17px;font-weight:600;margin:0 0 14px;
+  letter-spacing:-.01em;color:var(--ink);
+}
+.clause-body{font-size:14px;line-height:1.72;color:var(--ink-2);}
+.clause-body p{margin:0 0 12px;}
+.clause-body .li{display:flex;gap:10px;margin:0 0 10px;}
+.clause-body .li span:first-child{flex:none;color:var(--muted);}
+mark{
+  background:none;color:inherit;position:relative;padding:1px 0;
+  box-decoration-break:clone;-webkit-box-decoration-break:clone;
+}
+mark::before{
+  content:"";position:absolute;inset:-1px -3px;border-radius:3px;
+  background:var(--accent-soft);border-bottom:1.5px solid var(--accent);
+  transform:scaleX(0);transform-origin:left;z-index:-1;
+}
+mark.lit::before{animation:sweep .5s cubic-bezier(.22,.61,.36,1) forwards;}
+@keyframes sweep{to{transform:scaleX(1);}}
+.src-foot{
+  display:flex;align-items:center;gap:8px;margin-top:16px;
+  font-size:12px;color:var(--muted);
+}
+.src-foot .dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex:none;}
+
+/* ---------- loading ---------- */
+.trace{margin:20px 0 6px;}
+.trace-step{
+  display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--muted);
+  padding:4px 0;opacity:0;transform:translateY(4px);
+  animation:stepIn .3s cubic-bezier(.22,.61,.36,1) forwards;
+}
+.trace-step .tick{width:13px;height:13px;flex:none;display:grid;place-items:center;color:var(--accent);}
+.spin{
+  width:11px;height:11px;border:1.5px solid var(--rule);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .72s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes stepIn{to{opacity:1;transform:none;}}
+.trace-step.done{color:var(--ink-2);}
+.caret-blink{
+  display:inline-block;width:6px;height:15px;background:var(--accent);
+  vertical-align:-2px;margin-left:2px;border-radius:1px;
+  animation:blink .9s steps(2,end) infinite;
+}
+@keyframes blink{50%{opacity:0;}}
+.answer .cite{opacity:0;transform:scale(.6);transition:opacity .22s ease,transform .22s cubic-bezier(.34,1.56,.64,1);}
+.answer .cite.in{opacity:1;transform:none;}
+.enter{opacity:0;animation:riseIn .42s cubic-bezier(.22,.61,.36,1) forwards;}
+@keyframes riseIn{from{opacity:0;transform:translateY(7px);}to{opacity:1;transform:none;}}
+
+.skel{
+  background:linear-gradient(90deg,var(--rule-soft) 20%,var(--rule) 40%,var(--rule-soft) 62%);
+  background-size:300% 100%;animation:shimmer 1.25s ease-in-out infinite;
+  border-radius:5px;height:11px;margin-bottom:11px;
+}
+@keyframes shimmer{from{background-position:120% 0;}to{background-position:-40% 0;}}
+.skel-row{display:flex;align-items:center;gap:13px;padding:16px 12px;border-bottom:1px solid var(--rule-soft);}
+.skel-row .sq{width:15px;height:15px;flex:none;}
+.skel-row .a{flex:1;max-width:230px;margin:0;}
+.skel-row .b{width:96px;margin:0;}
+
+.bar{height:2px;background:var(--rule-soft);border-radius:2px;overflow:hidden;margin-top:9px;display:none;}
+.composer-in.busy .bar{display:block;}
+.bar i{display:block;height:100%;width:38%;background:var(--accent);border-radius:2px;animation:slide 1.15s ease-in-out infinite;}
+@keyframes slide{from{transform:translateX(-110%);}to{transform:translateX(330%);}}
+.composer-in.busy #field{color:var(--muted);}
+.composer-in.busy .send{opacity:.45;pointer-events:none;}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001ms !important;transition-duration:.001ms !important;}
+  mark::before{transform:scaleX(1);}
+  .answer .cite{opacity:1;transform:none;}
+}
+
+/* ---------- sidebar search + nav ---------- */
+.search{
+  display:flex;align-items:center;gap:8px;width:100%;
+  border:1px solid var(--rule);border-radius:10px;background:var(--surface);
+  padding:8px 10px;margin-bottom:14px;
+}
+.search svg{flex:none;color:var(--muted);}
+.search input{
+  border:none;background:none;outline:none;width:100%;
+  font-family:var(--sans);font-size:13.5px;color:var(--ink);
+}
+.search input::placeholder{color:var(--muted);}
+.search kbd{
+  font-family:var(--sans);font-size:11px;color:var(--muted);border:1px solid var(--rule);
+  border-radius:5px;padding:1px 5px;flex:none;
+}
+.nav-list{display:flex;flex-direction:column;gap:1px;margin-bottom:16px;}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:7px 9px;border-radius:8px;
+  font-size:13.5px;color:var(--ink-2);text-align:left;transition:background .12s,color .12s;
+}
+.nav-item svg{flex:none;color:var(--muted);}
+.nav-item:hover{background:var(--hover);color:var(--ink);}
+.nav-item[aria-current="true"]{background:var(--accent-soft);color:var(--ink);font-weight:600;}
+.nav-item[aria-current="true"] svg{color:var(--accent);}
+.recent{
+  display:block;width:100%;text-align:left;padding:6px 9px;border-radius:8px;
+  font-size:13px;color:var(--muted);line-height:1.35;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  transition:background .12s,color .12s;
+}
+.recent:hover{background:var(--hover);color:var(--ink);}
+
+/* ---------- chat home ---------- */
+.stage[data-view="home"] .scroll{padding-bottom:28px;display:flex;}
+.home{
+  margin:auto;width:100%;max-width:760px;
+  display:flex;flex-direction:column;align-items:center;
+  padding:20px 0 8px;text-align:center;
+}
+.orb{
+  width:104px;height:104px;border-radius:50%;position:relative;margin-bottom:26px;
+  background:
+    radial-gradient(circle at 32% 28%, #FFD9A8 0%, transparent 55%),
+    radial-gradient(circle at 70% 34%, var(--accent) 0%, transparent 58%),
+    radial-gradient(circle at 52% 76%, #F2B8A0 0%, transparent 62%),
+    radial-gradient(circle at 50% 50%, #FFF3E6 0%, #F4C9A8 100%);
+  filter:blur(9px);
+  opacity:.92;
+  animation:drift 14s ease-in-out infinite;
+}
+.orb::after{
+  content:"";position:absolute;inset:20% 22% 46% 26%;border-radius:50%;
+  background:rgba(255,255,255,.7);filter:blur(7px);
+}
+@keyframes drift{
+  0%,100%{transform:translateY(0) scale(1);}
+  50%{transform:translateY(-7px) scale(1.04);}
+}
+.greet{
+  font-family:var(--serif);font-weight:500;letter-spacing:-.025em;
+  font-size:clamp(30px,4.6vw,42px);line-height:1.1;margin:0;
+}
+.greet-sub{
+  font-size:15.5px;color:var(--muted);margin:10px 0 30px;max-width:44ch;
+}
+#composerSlot{width:100%;}
+.stage[data-view="home"] .composer{
+  position:static;padding:0;background:none;
+}
+.composer-in.big{
+  padding:16px 16px 12px;border-radius:20px;
+  box-shadow:0 1px 2px rgba(27,26,24,.05), 0 24px 60px -26px rgba(240,90,34,.35);
+}
+.composer-in.big #field{font-size:16px;min-height:66px;padding-top:2px;}
+.composer-in.big .tools{margin-top:6px;}
+.wash{
+  position:absolute;left:50%;top:56%;width:min(760px,86vw);height:230px;
+  transform:translateX(-50%);pointer-events:none;z-index:-1;
+  background:
+    radial-gradient(ellipse at 22% 50%, rgba(240,90,34,.13), transparent 62%),
+    radial-gradient(ellipse at 76% 46%, rgba(140,190,175,.14), transparent 60%);
+  filter:blur(38px);opacity:0;transition:opacity .5s;
+}
+.stage[data-view="home"] .wash{opacity:1;}
+.suggests{
+  display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:22px;
+}
+.sug{
+  border:1px solid var(--rule);background:var(--surface);border-radius:999px;
+  padding:7px 14px;font-size:13px;color:var(--ink-2);
+  transition:border-color .14s,color .14s;
+}
+.sug:hover{border-color:var(--accent);color:var(--ink);}
+.home-foot{
+  margin-top:26px;font-size:12px;color:var(--muted);
+  display:flex;align-items:center;gap:7px;
+}
+
+/* ---------- files page ---------- */
+.stage[data-view="library"] .composer{display:none;}
+.stage[data-view="library"] .scroll{padding-bottom:60px;}
+.crumbs{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:14px;font-size:12.5px;}
+.crumbs button{
+  color:var(--muted);padding:3px 7px;border-radius:6px;transition:background .12s,color .12s;
+}
+.crumbs button:hover{background:var(--hover);color:var(--ink);}
+.crumbs button:last-child{color:var(--ink-2);font-weight:600;}
+.crumbs .sep{color:var(--rule);}
+.list-head{
+  display:flex;align-items:center;gap:13px;padding:0 12px 8px;
+  border-bottom:1px solid var(--rule);margin-top:22px;
+  font-size:11.5px;color:var(--muted);
+}
+.list-head .h1c{flex:1;padding-left:28px;}
+.list-head .h2c{width:150px;flex:none;}
+.list-head .h3c{width:108px;flex:none;text-align:right;}
+@media (max-width:820px){.list-head .h2c,.list-head .h3c{display:none;}}
+.item .owner{width:150px;}
+.item.file .ico{color:var(--accent);opacity:.55;}
+.item.file:hover .ico{opacity:1;}
+.folder-actions{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;}
+.act{
+  border:1px solid var(--rule);background:var(--surface);border-radius:9px;
+  padding:8px 13px;font-size:13px;color:var(--ink-2);display:flex;align-items:center;gap:7px;
+  transition:border-color .14s,color .14s;
+}
+.act:hover{border-color:var(--accent);color:var(--ink);}
+.act.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);}
+.act.primary:hover{filter:brightness(1.25);}
+.empty{
+  border:1px dashed var(--rule);border-radius:12px;padding:34px 24px;text-align:center;
+  margin-top:22px;
+}
+.empty p{margin:0 0 4px;font-size:14px;font-weight:600;}
+.empty span{font-size:13px;color:var(--muted);}
+.pill-dark{
+  background:var(--ink);color:var(--paper);border-radius:999px;
+  padding:8px 14px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:7px;
+  transition:filter .14s;
+}
+.pill-dark:hover{filter:brightness(1.25);}
+@media (max-width:1180px){:root{--src-w:380px;}}
+@media (max-width:940px){
+  .app,.app[data-source="open"]{grid-template-columns:1fr;}
+  .nav{
+    position:fixed;inset:0 auto 0 0;width:280px;z-index:40;
+    transform:translateX(-100%);transition:transform .28s cubic-bezier(.22,.61,.36,1);
+  }
+  .nav.open{transform:none;box-shadow:var(--shadow-page);}
+  .menu-btn{display:inline-flex;}
+  .source{
+    position:fixed;inset:0;z-index:50;border-left:none;
+    transform:translateY(100%);transition:transform .3s cubic-bezier(.22,.61,.36,1);
+  }
+  .app[data-source="open"] .source{transform:none;}
+}
+</style>
+</head>
+<body>
+
+<div class="app" id="app" data-source="closed">
+
+  <!-- ===== navigator ===== -->
+  <aside class="nav" id="nav">
+    <div class="nav-head">
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <path d="M5 5h7l6 13-3.5 7z" fill="var(--accent)" opacity=".55"/>
+          <path d="M20 5h7L16 29h-6z" fill="var(--accent)"/>
+        </svg>
+        <b>Vecton <span>AI</span></b>
+      </div>
+
+      <label class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <input id="filter" placeholder="Find a folder or clause" autocomplete="off">
+        <kbd>⌘K</kbd>
+      </label>
+
+      <div class="nav-list">
+        <button class="nav-item" data-view="home" aria-current="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 18.5V8.8L12 4.5l6 4.3v9.7" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M10 18.5V14h4v4.5" stroke="currentColor" stroke-width="1.6"/></svg>
+          Ask
+        </button>
+        <button class="nav-item" data-view="library">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l1.8 2H19a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5v-10Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          Project files
+        </button>
+        <button class="nav-item" data-view="codes">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 5.5h6v13H5zM13 5.5h6v13h-6z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M5 9.5h6M13 9.5h6" stroke="currentColor" stroke-width="1.6"/></svg>
+          Codes &amp; standards
+        </button>
+      </div>
+
+      <button class="project">
+        <span>
+          <span class="p-name">Marsden Park — Stage 3</span><br>
+          <span class="p-meta">CDC 2026/0418 · 42 lots</span>
+        </span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="m8 9 4-4 4 4M16 15l-4 4-4-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <nav class="tree" id="tree">
+      <div class="tree-label">Project files</div>
+      <div id="folders"></div>
+      <div class="tree-label">Reference library</div>
+      <div id="refs"></div>
+      <div class="tree-label">Earlier questions</div>
+      <div id="recents"></div>
+    </nav>
+
+    <div class="nav-foot">
+      <div class="avatar">SR</div>
+      <div>
+        <div class="who">Shrikha R.</div>
+        <div class="role">Compliance lead</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="scrim" id="scrim"></div>
+
+  <!-- ===== stage ===== -->
+  <main class="stage" id="stage">
+    <div class="stage-top">
+      <button class="ghost menu-btn" id="menu" aria-label="Show folders">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      </button>
+      <div class="crumb" id="crumb"></div>
+      <div class="top-actions">
+        <button class="pill-dark" id="newAsk">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          New question
+        </button>
+      </div>
+    </div>
+
+    <div class="wash"></div>
+    <div class="scroll" id="scroll">
+      <!-- chat home -->
+      <section class="home" id="home">
+        <div class="orb" aria-hidden="true"></div>
+        <h1 class="greet" id="greet">Good morning, Shrikha</h1>
+        <p class="greet-sub">Ask about a clause, a consent condition, or anything in the 326 documents on this project.</p>
+        <div id="composerSlot"></div>
+        <div class="suggests">
+          <button class="sug" data-q="What ceiling height do we need in the bedrooms?">Ceiling heights</button>
+          <button class="sug" data-q="What BAL rating applies to lots 31–38 and what does it change?">BAL for lots 31–38</button>
+          <button class="sug" data-q="Do the ensuite floors need to be fully waterproofed?">Wet area waterproofing</button>
+          <button class="sug" data-q="Which conditions are still open before occupation?">Open conditions</button>
+        </div>
+        <div class="home-foot">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M12 4.5 20.5 19h-17L12 4.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 10v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="16.6" r=".9" fill="currentColor"/></svg>
+          Answers cite the clause they came from. Check them before you build to them.
+        </div>
+      </section>
+
+      <!-- library -->
+      <section class="pane" id="library">
+        <div class="lib-head">
+          <div class="crumbs" id="fileCrumbs"></div>
+          <h1 id="libTitle">Project files</h1>
+          <p class="sub" id="libSub">Everything the assistant can read, and the codes it checks against.</p>
+          <div class="counts" id="libCounts">
+            <div class="count"><b>326</b><span>documents</span></div>
+            <div class="count"><b>14</b><span>folders</span></div>
+            <div class="count"><b>3</b><span>code volumes</span></div>
+          </div>
+          <div class="folder-actions" id="libActions"></div>
+        </div>
+        <div class="list-head">
+          <span class="h1c">Name</span>
+          <span class="h2c">Added by</span>
+          <span class="h3c">Updated</span>
+        </div>
+        <div class="list" id="list"></div>
+        <div class="empty" id="libEmpty" hidden>
+          <p>This folder is empty</p>
+          <span>Drag documents here, or upload from the site app.</span>
+        </div>
+      </section>
+
+      <!-- thread -->
+      <section class="pane thread" id="thread" hidden></section>
+    </div>
+
+    <!-- composer -->
+    <div class="composer">
+      <div class="composer-in" id="composerIn">
+        <div class="chips" id="chips"></div>
+        <textarea id="field" rows="1" placeholder="Ask about a clause, a condition or an inspection — or have it drafted."></textarea>
+        <div class="tools">
+          <button class="tool locked" title="Search is limited to this project">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 10V7.5a3.5 3.5 0 1 1 7 0V10" stroke="currentColor" stroke-width="1.7"/></svg>
+            Marsden Park — Stage 3
+          </button>
+          <button class="tool">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M20 12.5 12.7 19.8a4.6 4.6 0 0 1-6.5-6.5l7.6-7.6a3 3 0 0 1 4.3 4.3l-7.5 7.5a1.5 1.5 0 0 1-2.1-2.1l6.9-6.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+            Add files
+          </button>
+          <button class="send" id="send" aria-label="Ask">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4.5 12h13m-5-5.5 5.5 5.5-5.5 5.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="bar"><i></i></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== source ===== -->
+  <aside class="source" id="source" aria-label="Cited source">
+    <div class="src-top">
+      <button class="back" id="closeSrc" aria-label="Close source">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      </button>
+      <div class="src-title" id="srcTitle"></div>
+      <div class="pager" id="srcPager"></div>
+    </div>
+    <div class="src-scroll">
+      <div class="page" id="srcPage"></div>
+      <div class="src-foot"><span class="dot"></span><span id="srcFoot"></span></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+/* ---------------- data ---------------- */
+const FOLDERS = [
+  {n:"01 Consent & Conditions", f:"12 files · 2 folders", by:"Dana Whitfield", d:"3 Aug 2026", kids:["CDC 2026/0418","Conditions register","BASIX certificate"]},
+  {n:"02 Design & Drawings",    f:"84 files · 5 folders", by:"Marcus Lee",      d:"28 Aug 2026", kids:["Architectural set","Structural set","Hydraulic"]},
+  {n:"03 Certificates & Reports",f:"31 files · 3 folders",by:"Dana Whitfield", d:"22 Aug 2026", kids:["BAL assessment","Soil classification","Termite"]},
+  {n:"04 Inspections & Records", f:"96 files · 1 folder", by:"Site team",       d:"9 Sep 2026",  kids:["Frame inspections","Waterproofing sign-off"]},
+  {n:"05 RFIs & Variations",     f:"27 files · 2 folders",by:"Marcus Lee",      d:"5 Sep 2026",  kids:["Open RFIs","Closed RFIs"]},
+  {n:"06 Handover & Occupation", f:"9 files · 1 folder",  by:"Dana Whitfield",  d:"1 Sep 2026",  kids:["Occupation certificate"]}
+];
+const REFS = [
+  {n:"NCC 2025 Volume Two", f:"1 volume", kids:["Part H2 Damp & weatherproofing","Part H4 Health & amenity","Part H6 Energy efficiency"]},
+  {n:"ABCB Housing Provisions", f:"1 volume", kids:["Part 10.2 Wet areas","Part 10.3 Ceiling heights","Part 10.4 Light & ventilation"]},
+  {n:"AS 3959 — Bushfire", f:"1 standard", kids:["Section 3 BAL determination","Section 5 BAL-12.5"]}
+];
+
+const ANSWERS = [
+  {
+    keys:["ceiling","height","habitable","bedroom"],
+    q:"What ceiling height do we need in the bedrooms?",
+    scope:"01 Consent & Conditions",
+    think:"Thought for 4 seconds",
+    lead:"2.4 m minimum",
+    body:`<p>Bedrooms are habitable rooms, so the floor-to-ceiling height must be at least <strong>2.4 m</strong> across the whole room.<sup class="cite" data-c="0" role="button" tabindex="0">1</sup> Non-habitable spaces in the same dwelling — the WC, laundry and hallway — can drop to <strong>2.1 m</strong>.<sup class="cite" data-c="0" role="button" tabindex="0">1</sup></p>
+    <p>Your Type B and Type C floor plans are drawn to 2.55 m, so both clear the code minimum. Type A is drawn to 2.40 m exactly, with no tolerance for a raised slab or a furred-down ceiling.<sup class="cite" data-c="1" role="button" tabindex="0">2</sup></p>`,
+    flag:{t:"A consent condition is stricter than the code",
+          p:"Condition 14 of CDC 2026/0418 requires 2.7 m to the ground floor of lots fronting Bandon Road (lots 1–9). The code minimum does not satisfy that condition — build those nine to 2.7 m."},
+    scopeline:"Searched 326 documents in this project",
+    cites:[
+      {doc:"ABCB Housing Provisions 2025", pg:214, of:512, clause:"Part 10.3", no:"10.3.1", ttl:"Ceiling heights",
+       html:`<p>A ceiling height must be not less than —</p>
+             <div class="li"><span>(a)</span><span><mark>for a habitable room other than a kitchen, 2.4 m</mark>; and</span></div>
+             <div class="li"><span>(b)</span><span>for a kitchen, corridor, passageway, bathroom, laundry, sanitary compartment or the like, 2.1 m; and</span></div>
+             <div class="li"><span>(c)</span><span>for a room or space with a sloping ceiling, 2.4 m over two-thirds of the floor area of the room.</span></div>`,
+       foot:"Cited passage · Part 10.3 · page 214"},
+      {doc:"Architectural set — Type A (Rev C)", pg:12, of:48, clause:"Sheet A-201", no:"A-201", ttl:"Ground floor sections",
+       html:`<p>Section B–B, ground floor:</p>
+             <div class="li"><span>—</span><span><mark>Finished floor to underside of ceiling: 2400 mm</mark></span></div>
+             <div class="li"><span>—</span><span>Ceiling batten depth: 35 mm (included in dimension above)</span></div>
+             <p>Refer engineer's slab detail S-104 before setting out. No allowance shown for services bulkhead in Bed 2.</p>`,
+       foot:"Cited passage · Sheet A-201 · page 12"}
+    ]
+  },
+  {
+    keys:["bal","bushfire","3959","ember","lot 31"],
+    q:"What BAL rating applies to lots 31–38 and what does it change?",
+    scope:"03 Certificates & Reports",
+    think:"Thought for 6 seconds",
+    lead:"BAL-19",
+    body:`<p>The bushfire assessment puts lots 31–38 at <strong>BAL-19</strong> — they back onto the Cudgegong reserve with a downslope of 5–10°.<sup class="cite" data-c="0" role="button" tabindex="0">1</sup> Everything from lot 39 west sits at BAL-12.5.</p>
+    <p>At BAL-19 the practical changes are external glazing to 5 mm toughened with screened openings, no unprotected gaps over 3 mm in the external envelope, and decking within 300 mm of the ground in a bushfire-resisting timber.<sup class="cite" data-c="1" role="button" tabindex="0">2</sup></p>`,
+    flag:{t:"Eight lots are drawn to the wrong rating",
+          p:"The current window schedule (Rev C, 28 Aug) specifies BAL-12.5 glazing across all lots. Lots 31–38 need reissuing before the frame stage inspection on 24 September."},
+    scopeline:"Searched 326 documents in this project",
+    cites:[
+      {doc:"Bushfire Attack Level Assessment — Stage 3", pg:9, of:34, clause:"Section 4.2", no:"4.2", ttl:"Lot-by-lot determination",
+       html:`<p>Applying Method 1 of AS 3959, with vegetation classified as Forest and an effective slope of 5–10° downslope:</p>
+             <div class="li"><span>—</span><span><mark>Lots 31 to 38 inclusive: BAL-19</mark></span></div>
+             <div class="li"><span>—</span><span>Lots 39 to 42 inclusive: BAL-12.5</span></div>
+             <p>Separation distances are measured from the proposed building footprint to the classified vegetation edge as surveyed 14 July 2026.</p>`,
+       foot:"Cited passage · Section 4.2 · page 9"},
+      {doc:"AS 3959 — Construction in bushfire-prone areas", pg:61, of:148, clause:"Section 6", no:"6.5", ttl:"Construction for BAL-19",
+       html:`<p>Windows shall comply with the following:</p>
+             <div class="li"><span>(a)</span><span><mark>External glazing shall be toughened glass of minimum 5 mm thickness</mark>, and openable portions shall be screened.</span></div>
+             <div class="li"><span>(b)</span><span>Frames shall be metal, bushfire-resisting timber, or a combination of the two.</span></div>`,
+       foot:"Cited passage · Section 6.5 · page 61"}
+    ]
+  },
+  {
+    keys:["waterproof","wet area","ensuite","bathroom","shower"],
+    q:"Do the ensuite floors need to be fully waterproofed?",
+    scope:"04 Inspections & Records",
+    think:"Thought for 3 seconds",
+    lead:"Only inside the shower",
+    body:`<p>The whole ensuite floor has to be <strong>water resistant</strong>, but only the shower area itself must be <strong>waterproof</strong> — plus 1500 mm of wall height in an unenclosed shower and the floor-to-wall junctions throughout.<sup class="cite" data-c="0" role="button" tabindex="0">1</sup></p>
+    <p>Where the ensuite sits over a habitable room below, which applies to all Type C upper floors here, the entire floor becomes waterproof rather than water resistant.<sup class="cite" data-c="0" role="button" tabindex="0">1</sup></p>`,
+    flag:null,
+    scopeline:"Searched 326 documents in this project",
+    cites:[
+      {doc:"ABCB Housing Provisions 2025", pg:198, of:512, clause:"Part 10.2", no:"10.2.2", ttl:"Waterproofing of wet areas",
+       html:`<p>In a bathroom or ensuite —</p>
+             <div class="li"><span>(a)</span><span><mark>the floor of an enclosed shower must be waterproof and the remainder of the floor must be water resistant</mark>; and</span></div>
+             <div class="li"><span>(b)</span><span>wall junctions must be waterproof for the full height of the shower wall or 1800 mm, whichever is the lesser; and</span></div>
+             <div class="li"><span>(c)</span><span>where the wet area is above a habitable room, the whole floor must be waterproof.</span></div>`,
+       foot:"Cited passage · Part 10.2 · page 198"}
+    ]
+  }
+];
+
+const FALLBACK = {
+  q:"", scope:null, think:"Thought for 5 seconds",
+  lead:"Nothing conclusive yet",
+  body:`<p>Nothing in this project's files answers that directly. The closest material is the conditions register and the NCC volumes in the reference library.</p>
+        <p>Narrow it by picking a folder in the sidebar, or name the lot number or clause you're chasing and it'll search from there.</p>`,
+  flag:null, scopeline:"Searched 326 documents in this project", cites:[]
+};
+
+/* ---------------- build tree ---------------- */
+const ICO_FOLDER = '<svg class="ico" width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l1.8 2H19a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5v-10Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+const ICO_DOC = '<svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M6.5 3.5h7L18 8v12.5H6.5V3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M13.2 3.6V8H18" stroke="currentColor" stroke-width="1.6"/></svg>';
+const CARET = '<svg class="caret" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="m9.5 6 6 6-6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function buildTree(el, data, rootKey){
+  data.forEach(g=>{
+    const wrap = document.createElement('div');
+    const b = document.createElement('button');
+    b.className='row'; b.setAttribute('aria-expanded','false');
+    b.innerHTML = CARET + ICO_FOLDER + `<span class="lbl">${g.n}</span>`;
+    const kids = document.createElement('div'); kids.className='kids';
+    g.kids.forEach(k=>{
+      const kb=document.createElement('button');
+      kb.className='row'; kb.innerHTML = ICO_DOC + `<span class="lbl">${k}</span>`;
+      kb.onclick=e=>{e.stopPropagation(); markCurrent(kb); goTo(rootKey,[g.n,k]); closeNav();};
+      kids.appendChild(kb);
+    });
+    b.onclick=()=>{
+      const open = kids.classList.toggle('open');
+      b.setAttribute('aria-expanded', open);
+      markCurrent(b); goTo(rootKey,[g.n]); closeNav();
+    };
+    wrap.append(b,kids); el.appendChild(wrap);
+  });
+}
+function markCurrent(node){
+  document.querySelectorAll('.tree .row').forEach(r=>r.removeAttribute('aria-current'));
+  node.setAttribute('aria-current','true');
+}
+buildTree(document.getElementById('folders'), FOLDERS, 'project');
+buildTree(document.getElementById('refs'), REFS, 'codes');
+
+/* ---------------- library list ---------------- */
+/* ---------------- files page ---------------- */
+const F=(n,m,by,d,pg)=>({n,m,by,d,pg});
+const FILES={
+  "CDC 2026/0418":[
+    F("CDC determination.pdf","PDF · 18 pages","Dana Whitfield","3 Aug 2026",18),
+    F("Approved plan stamp set.pdf","PDF · 42 pages","Dana Whitfield","3 Aug 2026",42)],
+  "Conditions register":[
+    F("Conditions register.xlsx","Spreadsheet · 61 rows","Dana Whitfield","5 Sep 2026",4),
+    F("Condition 14 — clarification.pdf","PDF · 3 pages","Marcus Lee","21 Aug 2026",3)],
+  "BASIX certificate":[
+    F("BASIX 1884733S.pdf","PDF · 9 pages","Dana Whitfield","3 Aug 2026",9)],
+  "Architectural set":[
+    F("Type A — Rev C.pdf","PDF · 48 pages","Marcus Lee","28 Aug 2026",48),
+    F("Type B — Rev C.pdf","PDF · 46 pages","Marcus Lee","28 Aug 2026",46),
+    F("Type C — Rev B.pdf","PDF · 51 pages","Marcus Lee","14 Aug 2026",51),
+    F("Window schedule — Rev C.pdf","PDF · 12 pages","Marcus Lee","28 Aug 2026",12)],
+  "Structural set":[
+    F("Slab detail S-104.pdf","PDF · 6 pages","Ingrid Voss","19 Aug 2026",6),
+    F("Footing design certificate.pdf","PDF · 4 pages","Ingrid Voss","19 Aug 2026",4)],
+  "Hydraulic":[
+    F("Stormwater layout H-201.pdf","PDF · 8 pages","Ingrid Voss","11 Aug 2026",8)],
+  "BAL assessment":[
+    F("Bushfire Attack Level Assessment — Stage 3.pdf","PDF · 34 pages","Rowan Fitzgerald","22 Aug 2026",34),
+    F("Vegetation survey 14 July.pdf","PDF · 11 pages","Rowan Fitzgerald","18 Jul 2026",11)],
+  "Soil classification":[
+    F("Geotechnical report — Class M.pdf","PDF · 22 pages","Ingrid Voss","2 Jul 2026",22)],
+  "Termite":[
+    F("Termite management certificate.pdf","PDF · 2 pages","Site team","30 Aug 2026",2)],
+  "Frame inspections":[
+    F("Frame inspection — lots 31–38.pdf","PDF · 16 pages","Site team","9 Sep 2026",16),
+    F("Frame inspection — lots 21–30.pdf","PDF · 14 pages","Site team","1 Sep 2026",14)],
+  "Waterproofing sign-off":[
+    F("Wet area sign-off — lots 1–12.pdf","PDF · 7 pages","Site team","28 Aug 2026",7)],
+  "Open RFIs":[
+    F("RFI-047 — ceiling height lot 3.pdf","PDF · 2 pages","Marcus Lee","5 Sep 2026",2),
+    F("RFI-048 — glazing spec lots 31–38.pdf","PDF · 3 pages","Marcus Lee","5 Sep 2026",3)],
+  "Closed RFIs":[
+    F("RFI-041 — slab step detail.pdf","PDF · 2 pages","Marcus Lee","12 Aug 2026",2)],
+  "Occupation certificate":[
+    F("OC checklist — draft.docx","Document · 5 pages","Dana Whitfield","1 Sep 2026",5)]
+};
+const CODE_FILES={
+  "Part H2 Damp & weatherproofing":[F("NCC 2025 Volume Two — Part H2","Code volume · 512 pages","ABCB","1 May 2026",512)],
+  "Part H4 Health & amenity":[F("NCC 2025 Volume Two — Part H4","Code volume · 512 pages","ABCB","1 May 2026",512)],
+  "Part H6 Energy efficiency":[F("NCC 2025 Volume Two — Part H6","Code volume · 512 pages","ABCB","1 May 2026",512)],
+  "Part 10.2 Wet areas":[F("ABCB Housing Provisions 2025 — Part 10.2","Provisions · 512 pages","ABCB","1 May 2026",512)],
+  "Part 10.3 Ceiling heights":[F("ABCB Housing Provisions 2025 — Part 10.3","Provisions · 512 pages","ABCB","1 May 2026",512)],
+  "Part 10.4 Light & ventilation":[F("ABCB Housing Provisions 2025 — Part 10.4","Provisions · 512 pages","ABCB","1 May 2026",512)],
+  "Section 3 BAL determination":[F("AS 3959 — Section 3","Standard · 148 pages","Standards Australia","1 May 2026",148)],
+  "Section 5 BAL-12.5":[F("AS 3959 — Section 5","Standard · 148 pages","Standards Australia","1 May 2026",148)]
+};
+
+const list=document.getElementById('list');
+let root='project', path=[];
+
+function source(){ return root==='codes' ? REFS : FOLDERS; }
+function filesFor(k){ return FILES[k] || CODE_FILES[k] || []; }
+
+function goTo(r, p){
+  root=r; path=p.slice();
+  showView(r==='codes'?'codes':'library');
+}
+
+function renderLibrary(){
+  const src=source();
+  const crumbs=document.getElementById('fileCrumbs');
+  const rootLabel = root==='codes' ? 'Codes & standards' : 'Project files';
+  let rows=[], title=rootLabel, sub='';
+
+  if(path.length===0){
+    rows = src.map(f=>({kind:'folder', n:f.n, m:f.f, by:f.by||'ABCB', d:f.d||'1 May 2026'}));
+    sub = root==='codes'
+      ? 'The code volumes this project is checked against.'
+      : 'Everything the assistant can read for Marsden Park — Stage 3.';
+  }else if(path.length===1){
+    const f=src.find(x=>x.n===path[0]) || {kids:[]};
+    rows = (f.kids||[]).map(k=>{const c=filesFor(k).length; return {kind:'folder', n:k, m:`${c} file${c===1?'':'s'}`, by:f.by||'ABCB', d:f.d||'1 May 2026'};});
+    title=path[0]; sub=f.f||'';
+  }else{
+    rows = filesFor(path[1]).map(x=>({kind:'file', ...x}));
+    title=path[1]; sub=`${rows.length} document${rows.length===1?'':'s'} in this folder`;
+  }
+
+  document.getElementById('libTitle').textContent=title;
+  document.getElementById('libSub').textContent=sub;
+  document.getElementById('libCounts').hidden = path.length>0 || root==='codes';
+  document.getElementById('libEmpty').hidden = rows.length>0;
+
+  crumbs.innerHTML='';
+  const seg=(label, p)=>{
+    const b=document.createElement('button');
+    b.textContent=label; b.onclick=()=>{path=p; renderLibrary();};
+    crumbs.appendChild(b);
+  };
+  seg(rootLabel, []);
+  path.forEach((p,i)=>{
+    const s=document.createElement('span'); s.className='sep'; s.textContent='/';
+    crumbs.appendChild(s);
+    seg(p, path.slice(0,i+1));
+  });
+
+  const actions=document.getElementById('libActions');
+  actions.innerHTML='';
+  if(path.length<=1){
+    const newBtn=document.createElement('button');
+    newBtn.className='act';
+    newBtn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l1.8 2H19a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5v-10Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 11v5M9.5 13.5h5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>New folder`;
+    newBtn.onclick=startNewFolder;
+    actions.append(newBtn);
+  }
+  if(path.length){
+    const askBtn=document.createElement('button');
+    askBtn.className='act primary';
+    askBtn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 6.5h14v9H9.5L5 19V6.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>Ask about this folder`;
+    askBtn.onclick=()=>{ setScope(path[path.length-1]); showView('home'); };
+    const upBtn=document.createElement('button');
+    upBtn.className='act';
+    upBtn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 19V6m0 0-5 5m5-5 5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>Upload here`;
+    actions.append(askBtn, upBtn);
+  }
+
+  list.innerHTML='';
+  rows.forEach((r,i)=>{
+    const b=document.createElement('button');
+    b.className='item'+(r.kind==='file'?' file':'');
+    const initials=(r.by||'').split(' ').map(w=>w[0]).slice(0,2).join('');
+    b.innerHTML = (r.kind==='file'?ICO_DOC.replace('class="ico" width="14" height="14"','class="ico" width="15" height="15"'):ICO_FOLDER) +
+      `<span class="body"><span class="nm">${r.n}</span><span class="mt">${r.m}</span></span>
+       <span class="owner"><span class="chip-av">${initials}</span>${r.by}</span>
+       <span class="when">${r.d}</span>`;
+    b.onclick = r.kind==='folder'
+      ? ()=>{ path=[...path, r.n]; renderLibrary(); document.getElementById('scroll').scrollTop=0; }
+      : ()=>openDoc({doc:r.n, pg:1, of:r.pg||1, no:'Page 1', ttl:r.n.replace(/\.[a-z]+$/,''),
+          html:`<p>Opened from ${path.join(' / ')}. This is the first indexed page of the document.</p>
+                <p>Every page here has been parsed and embedded, so it can be cited directly in an answer.</p>`,
+          foot:`${r.m} · added by ${r.by}`});
+    if(!RM()){ b.classList.add('enter'); b.style.animationDelay=(i*35)+'ms'; }
+    list.appendChild(b);
+  });
+}
+
+/* ---------------- new folder ---------------- */
+function startNewFolder(){
+  const open=list.querySelector('.newf input');
+  if(open){ open.focus(); return; }
+  const row=document.createElement('div');
+  row.className='item newf';
+  row.innerHTML = ICO_FOLDER +
+    `<input placeholder="Folder name" aria-label="New folder name" autocomplete="off" spellcheck="false">`;
+  list.prepend(row);
+  document.getElementById('libEmpty').hidden = true;
+  const input=row.querySelector('input');
+  input.focus();
+  let closed=false;
+  const finish=(save)=>{
+    if(closed) return; closed=true;
+    const name=input.value.trim();
+    if(save && name) createFolder(name);
+    renderLibrary();
+  };
+  input.addEventListener('keydown',e=>{
+    if(e.key==='Enter'){ e.preventDefault(); finish(true); }
+    else if(e.key==='Escape'){ e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur',()=>finish(true));
+}
+function createFolder(name){
+  const today=new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+  if(path.length===0){
+    if(source().some(f=>f.n===name)) return;
+    source().push({n:name, f:'0 files · 0 folders', by:'Shrikha R.', d:today, kids:[]});
+  }else{
+    const f=source().find(x=>x.n===path[0]);
+    if(!f) return;
+    f.kids=f.kids||[];
+    if(f.kids.includes(name)) return;
+    f.kids.push(name);
+    FILES[name]=FILES[name]||[];
+  }
+}
+
+/* ---------------- scope chips ---------------- */
+let scope = null;
+const chips = document.getElementById('chips');
+function setScope(name){
+  scope = name; renderChips();
+  document.getElementById('field').focus();
+}
+function renderChips(){
+  chips.innerHTML='';
+  if(!scope) return;
+  const c=document.createElement('span'); c.className='chip';
+  c.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l1.8 2H19a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5v-10Z" stroke="currentColor" stroke-width="1.6"/></svg>${scope}<button class="x" aria-label="Clear folder">×</button>`;
+  c.querySelector('.x').onclick=()=>{scope=null;renderChips();
+    document.querySelectorAll('.tree .row').forEach(r=>r.removeAttribute('aria-current'));};
+  chips.appendChild(c);
+}
+
+/* ---------------- ask ---------------- */
+const field=document.getElementById('field');
+const thread=document.getElementById('thread');
+const library=document.getElementById('library');
+const crumb=document.getElementById('crumb');
+const newAsk=document.getElementById('newAsk');
+let current=null;
+
+field.addEventListener('input',()=>{field.style.height='auto';field.style.height=field.scrollHeight+'px';});
+field.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();ask(field.value);}});
+document.getElementById('send').onclick=()=>ask(field.value);
+
+function pick(q){
+  const t=q.toLowerCase();
+  return ANSWERS.find(a=>a.keys.some(k=>t.includes(k))) || Object.assign({},FALLBACK,{q});
+}
+
+const RM = ()=>matchMedia('(prefers-reduced-motion: reduce)').matches;
+const wait = ms=>new Promise(r=>setTimeout(r, RM()?0:ms));
+const TICK = '<span class="tick"><svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="m5 12.5 4.5 4.5L19 7.5" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+const SPIN = '<span class="tick"><span class="spin"></span></span>';
+let busy=false;
+
+/* reveals text node by node so the answer arrives the way it is generated */
+function stream(box, html){
+  return new Promise(done=>{
+    box.innerHTML = html;
+    if(RM()){ box.querySelectorAll('.cite').forEach(c=>c.classList.add('in')); return done(); }
+    const walk=document.createTreeWalker(box, NodeFilter.SHOW_TEXT), nodes=[];
+    let n; while((n=walk.nextNode())) nodes.push({node:n, full:n.nodeValue});
+    nodes.forEach(o=>{o.node.nodeValue='';});
+    const caret=document.createElement('span'); caret.className='caret-blink';
+    let i=0, pos=0;
+    (function tick(){
+      if(i>=nodes.length){ caret.remove(); return done(); }
+      const o=nodes[i], p=o.node.parentElement;
+      if(pos===0){
+        if(p.classList.contains('cite')) p.classList.add('in');
+        p.appendChild(caret);
+      }
+      pos+=3;
+      o.node.nodeValue=o.full.slice(0,pos);
+      if(pos>=o.full.length){ i++; pos=0; }
+      setTimeout(tick, 11);
+    })();
+  });
+}
+
+async function ask(text){
+  if(busy) return;
+  const q=(text||'').trim(); if(!q) return;
+  const a=pick(q); current=a;
+  field.value=''; field.style.height='auto';
+  library.hidden=true; thread.hidden=false;
+  showView('thread');
+  closeSource(); closeNav();
+  if(!SEEDED.includes(q)){ SEEDED.unshift(q); renderRecents(); }
+
+  const usedScope = scope || a.scope;
+  const steps = [
+    `Searching ${usedScope ? usedScope : 'all project files'} — 326 documents`,
+    a.cites.length ? `Reading ${a.cites[0].doc}` : 'Ranking candidate passages',
+    a.flag ? 'Comparing against consent conditions' : 'Checking for conflicting conditions'
+  ];
+
+  thread.innerHTML = `
+    ${usedScope?`<div class="scope-tag">${ICO_FOLDER.replace('class="ico" ','')}${usedScope}</div><br>`:''}
+    <div class="ask">${escapeHtml(q)}</div>
+    <div class="trace" id="trace"></div>
+    <div class="answer" id="ansBox"></div>`;
+  crumb.innerHTML = `<b>Marsden Park — Stage 3</b>${usedScope?` <span>/</span> ${usedScope}`:''}`;
+  document.getElementById('scroll').scrollTop=0;
+
+  busy=true;
+  const composer=document.getElementById('composerIn');
+  composer.classList.add('busy');
+  field.placeholder='Working…';
+
+  const trace=document.getElementById('trace');
+  const t0=Date.now();
+  for(const s of steps){
+    const row=document.createElement('div');
+    row.className='trace-step';
+    row.innerHTML = SPIN + `<span>${s}</span>`;
+    trace.appendChild(row);
+    await wait(560);
+    row.classList.add('done');
+    row.firstElementChild.outerHTML = TICK;
+  }
+  await wait(180);
+
+  const secs = Math.max(1, Math.round((Date.now()-t0)/1000));
+  trace.innerHTML = `<div class="thought" style="margin:0">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="m9.5 6 6 6-6 6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+      Thought for ${secs} second${secs===1?'':'s'}, read ${a.cites.length||0} source${a.cites.length===1?'':'s'}
+    </div>`;
+
+  const box=document.getElementById('ansBox');
+  box.innerHTML = `<p class="lead enter">${a.lead}</p><div id="bodyBox"></div>`;
+  await wait(260);
+  await stream(document.getElementById('bodyBox'), a.body);
+
+  if(a.flag){
+    const f=document.createElement('div');
+    f.className='flag enter';
+    f.innerHTML=`<h4>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="color:var(--accent)"><path d="M12 4.5 20.5 19h-17L12 4.5Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 10v4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="16.6" r=".9" fill="currentColor"/></svg>
+      ${a.flag.t}</h4><p>${a.flag.p}</p>`;
+    box.appendChild(f);
+    await wait(220);
+  }
+
+  const foot=document.createElement('div');
+  foot.className='foot enter';
+  foot.innerHTML=`
+    <div class="scope-line">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="6.5" stroke="currentColor" stroke-width="1.7"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      ${a.scopeline}
+    </div>
+    ${a.cites.length?`<div class="srcs"><span class="k">Sources</span>${
+      a.cites.map((c,i)=>`<button class="src-chip" data-c="${i}"><i>${i+1}</i>${c.doc}</button>`).join('')
+    }</div>`:''}`;
+  thread.appendChild(foot);
+
+  thread.querySelectorAll('[data-c]').forEach(el=>{
+    const open=()=>openSource(+el.dataset.c);
+    el.onclick=open;
+    el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};
+  });
+
+  busy=false;
+  composer.classList.remove('busy');
+  field.placeholder='Ask a follow-up, or start somewhere new.';
+}
+
+newAsk.onclick=()=>{
+  showView('home');
+  closeSource();
+  setTimeout(()=>field.focus(), 60);
+};
+/* ---------------- source panel ---------------- */
+const app=document.getElementById('app');
+function openDoc(c){
+  const page=document.getElementById('srcPage');
+  document.getElementById('srcTitle').textContent=c.doc;
+  document.getElementById('srcPager').textContent=`Loading page ${c.pg}`;
+  document.getElementById('srcFoot').textContent='Fetching page…';
+  page.innerHTML =
+    `<div class="skel" style="width:32%;height:15px;margin-bottom:16px"></div>
+     <div class="skel" style="width:88%"></div>
+     <div class="skel" style="width:96%"></div>
+     <div class="skel" style="width:72%"></div>
+     <div class="skel" style="width:91%;margin-top:20px"></div>
+     <div class="skel" style="width:64%"></div>`;
+  app.dataset.source='open';
+
+  setTimeout(()=>{
+    if(app.dataset.source!=='open') return;
+    document.getElementById('srcPager').textContent=`${c.pg} of ${c.of}`;
+    page.innerHTML=`<p class="clause-no">${c.no}</p><p class="clause-ttl">${c.ttl}</p><div class="clause-body">${c.html}</div>`;
+    document.getElementById('srcFoot').textContent=c.foot;
+    requestAnimationFrame(()=>{
+      page.querySelectorAll('mark').forEach((m,k)=>{
+        m.classList.remove('lit'); void m.offsetWidth;
+        setTimeout(()=>m.classList.add('lit'), RM()?0:k*140);
+      });
+    });
+  }, RM()?0:420);
+}
+
+function openSource(i){
+  const c=current && current.cites[i]; if(!c) return;
+  document.querySelectorAll('.cite,.src-chip').forEach(e=>e.dataset.active='false');
+  thread.querySelectorAll(`[data-c="${i}"]`).forEach(e=>e.dataset.active='true');
+  openDoc(c);
+}
+function closeSource(){
+  app.dataset.source='closed';
+  document.querySelectorAll('.cite,.src-chip').forEach(e=>e.dataset.active='false');
+}
+document.getElementById('closeSrc').onclick=closeSource;
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeSource();closeNav();}});
+
+/* ---------------- views ---------------- */
+const stageEl=document.getElementById('stage');
+const composerWrap=document.querySelector('.composer');
+const homeEl=document.getElementById('home');
+const composerIn=document.getElementById('composerIn');
+
+function showView(v){
+  const dest = (v==='codes') ? 'library' : v;
+  homeEl.hidden    = dest!=='home';
+  library.hidden   = dest!=='library';
+  thread.hidden    = dest!=='thread';
+  stageEl.dataset.view = dest;
+
+  if(dest==='home'){
+    document.getElementById('composerSlot').appendChild(composerWrap);
+    composerIn.classList.add('big');
+    field.placeholder='Ask about a clause, a condition or an inspection — or have it drafted.';
+  }else{
+    stageEl.appendChild(composerWrap);
+    composerIn.classList.remove('big');
+  }
+
+  const navKey = dest==='library' ? (root==='codes'?'codes':'library') : 'home';
+  document.querySelectorAll('.nav-item').forEach(n=>
+    n.setAttribute('aria-current', String(n.dataset.view===navKey)));
+
+  newAsk.hidden = (dest==='home');
+  newAsk.innerHTML = dest==='library'
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M5 6.5h14v9H9.5L5 19V6.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>Ask a question`
+    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>New question`;
+
+  crumb.innerHTML = dest==='library' ? '' : '';
+  if(dest==='library') renderLibrary();
+  document.getElementById('scroll').scrollTop=0;
+}
+document.querySelectorAll('.nav-item').forEach(n=>
+  n.onclick=()=>{
+    if(n.dataset.view==='home'){ showView('home'); }
+    else { goTo(n.dataset.view==='codes'?'codes':'project', []); }
+    closeNav();
+  });
+
+/* time-aware greeting */
+(function(){
+  const h=new Date().getHours();
+  const part = h<12 ? 'Good morning' : h<17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('greet').textContent = `${part}, Shrikha`;
+})();
+
+/* recent questions */
+const recents=document.getElementById('recents');
+const SEEDED=[
+  "Can we pour the slab before the termite certificate?",
+  "What's the minimum window area for natural light?",
+  "Does lot 12 need a retaining wall permit?"
+];
+function renderRecents(){
+  recents.innerHTML='';
+  SEEDED.slice(0,6).forEach(q=>{
+    const b=document.createElement('button');
+    b.className='recent'; b.textContent=q; b.title=q;
+    b.onclick=()=>ask(q);
+    recents.appendChild(b);
+  });
+}
+renderRecents();
+
+/* sidebar filter */
+document.getElementById('filter').addEventListener('input', e=>{
+  const t=e.target.value.trim().toLowerCase();
+  document.querySelectorAll('#folders > div, #refs > div').forEach(g=>{
+    const hit = !t || g.textContent.toLowerCase().includes(t);
+    g.style.display = hit ? '' : 'none';
+  });
+});
+document.addEventListener('keydown', e=>{
+  if((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k'){
+    e.preventDefault(); nav.classList.add('open'); document.getElementById('filter').focus();
+  }
+});
+
+document.querySelectorAll('.sug').forEach(s=>s.onclick=()=>ask(s.dataset.q));
+showView('home');
+const scroller=document.getElementById('scroll'), stage=document.getElementById('stage');
+scroller.addEventListener('scroll',()=>stage.classList.toggle('scrolled',scroller.scrollTop>8));
+
+const nav=document.getElementById('nav'), scrim=document.getElementById('scrim');
+document.getElementById('menu').onclick=()=>{nav.classList.add('open');scrim.classList.add('on');};
+function closeNav(){nav.classList.remove('open');scrim.classList.remove('on');}
+scrim.onclick=closeNav;
+
+
+function escapeHtml(s){return s.replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+</script>
+</body>
+</html>

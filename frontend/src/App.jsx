@@ -8,7 +8,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="app-shell">
-        <Sidebar />
+        {/* <Sidebar /> */}
 
         <div className="app-main">
           <Routes>

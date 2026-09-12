@@ -53,6 +53,8 @@ class IngestReport:
     corpora: dict = field(default_factory=dict)  # corpus name -> CorpusReport
     images_matched: int = 0
     images_unmatched: list = field(default_factory=list)
+    figures_described: int = 0          # matched images with a stored description
+    figures_undescribed: list = field(default_factory=list)  # matched, but no description
     standards_matched: int = 0
     standards_unmatched: list = field(default_factory=list)
     internal_refs_resolved: int = 0
