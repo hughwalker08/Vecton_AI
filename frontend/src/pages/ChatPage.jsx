@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useLocation, useParams } from 'react-router-dom'
 import { askQuestion } from '../api/client.js'
 import './ChatPage.css'
 
@@ -7,12 +8,11 @@ export default function ChatPage({ jurisdiction }) {
   const [isLoading, setIsLoading] = useState(false)
   const [citations, setCitations] = useState([])
   const [messages, setMessages] = useState([])
+  const { chatId } = useParams()
+  const location = useLocation()
+  const startedChatId = useRef(null)
 
-  async function handleSubmit(event) {
-    event.preventDefault()
-
-    const trimmedQuestion = question.trim()
-
+  async function sendMessage(trimmedQuestion) {
     if (!trimmedQuestion) {
       return
     }
@@ -65,6 +65,24 @@ export default function ChatPage({ jurisdiction }) {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // A chat started from the home page arrives here with the question that
+  // kicked it off — send it automatically instead of waiting for the user
+  // to retype it. Guarded by chatId so it only fires once per new chat.
+  useEffect(() => {
+    const initialQuestion = location.state?.initialQuestion
+
+    if (initialQuestion && startedChatId.current !== chatId) {
+      startedChatId.current = chatId
+      sendMessage(initialQuestion)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId, location.state])
+
+  function handleSubmit(event) {
+    event.preventDefault()
+    sendMessage(question.trim())
   }
 
   return (
