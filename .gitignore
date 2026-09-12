@@ -18,5 +18,16 @@ dist/
 .idea/
 .DS_Store
 
+
+# NCC/ABCB source images and their generated descriptions
+backend/data/images/**
+!backend/data/images/README.md
+backend/data/image_descriptions/*.jsonl
+backend/data/image_descriptions/*.json
+ncc-2025-housing-provisions-v1.2/*
+ncc-2025-volume-two-v1.2/*
+# Ingest pipeline output (generated, re-run to regenerate)
+backend/app/ingest/output/
+=======
 ncc-2025-volume-two-v1.2/*
 ncc-2025-housing-provisions-v1.2/*

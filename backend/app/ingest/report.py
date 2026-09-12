@@ -29,6 +29,19 @@ def print_report(report: IngestReport) -> None:
         for f in report.images_unmatched[:10]:
             print(f"    - {f}")
 
+    undescribed = len(report.figures_undescribed)
+    print(
+        f"Figure descriptions: {report.figures_described} of "
+        f"{report.images_matched} matched figures"
+    )
+    if undescribed:
+        print(f"    {undescribed} matched figure(s) have no description -- those chunks")
+        print("    carry only the caption, so the drawing's dimensions are not searchable.")
+        print("    Generate them:  python scripts/describe_images.py <source>/images \\")
+        print("                        --out app/ingest/output/<corpus>_image_descriptions.jsonl")
+        for f in report.figures_undescribed[:10]:
+            print(f"    - {f}")
+
     print(f"\nStandards: {report.standards_matched} matched, {len(report.standards_unmatched)} unmatched")
     if report.standards_unmatched:
         for s in sorted(report.standards_unmatched)[:15]:

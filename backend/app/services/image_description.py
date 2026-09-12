@@ -27,11 +27,23 @@ from app.core.config import settings
 # so you can tell which descriptions need regenerating after a prompt edit.
 PROMPT_VERSION = "1"
 
-# Gemini accepts these inline. Anything else is skipped by the batch script.
-SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
+# Formats Gemini accepts inline. Anything else is skipped by the batch script.
+RASTER_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
+
+# Vector formats we rasterise before sending. The NCC/ABCB corpus ships its
+# figures as SVG (see app/ingest/corpus.py), so this is the common case there,
+# not an edge case.
+VECTOR_EXTENSIONS = {".svg"}
+
+SUPPORTED_EXTENSIONS = RASTER_EXTENSIONS | VECTOR_EXTENSIONS
 
 # Inline request payload cap is ~20 MB; stay well under it.
 MAX_IMAGE_BYTES = 15 * 1024 * 1024
+
+# Width to rasterise SVG at. NCC figures carry dimension text at small point
+# sizes; rendering at native size makes those digits unreadable to the model,
+# and misread digits are the failure mode that matters most here.
+SVG_RENDER_WIDTH = 1600
 
 PROMPT = """You are transcribing a figure from the National Construction Code (NCC) \
 2025 Volume Two or the ABCB Housing Provisions Standard, for inclusion in a \
@@ -119,13 +131,109 @@ def build_model(model_name: str | None = None):
     return genai.GenerativeModel(model_name or settings.VISION_MODEL_NAME)
 
 
-def _mime_type(path: Path) -> str:
-    guessed, _ = mimetypes.guess_type(path.name)
+def mime_type_for(name: str) -> str:
+    """Best-guess image MIME type for a file name."""
+    guessed, _ = mimetypes.guess_type(name)
     if guessed and guessed.startswith("image/"):
         return guessed
     # mimetypes misses .webp on some Windows/WSL setups.
-    return {".webp": "image/webp", ".bmp": "image/bmp"}.get(
-        path.suffix.lower(), "image/png"
+    return {".webp": "image/webp", ".bmp": "image/bmp", ".svg": "image/svg+xml"}.get(
+        Path(name).suffix.lower(), "image/png"
+    )
+
+
+def rasterise_svg(data: bytes, width: int = SVG_RENDER_WIDTH) -> bytes:
+    """Render SVG source to PNG bytes.
+
+    Gemini cannot read SVG inline, so corpus figures have to be rasterised
+    first. PyMuPDF does this with no native dependencies, which matters on
+    Windows -- the obvious alternatives (cairosvg, svglib+reportlab) both end
+    up needing a cairo build. cairosvg is still preferred when it happens to
+    be installed, since it tracks the SVG spec more closely.
+    """
+    try:
+        import cairosvg
+
+        return cairosvg.svg2png(bytestring=data, output_width=width)
+    except ImportError:
+        pass
+    except Exception as exc:  # noqa: BLE001 - malformed SVG, missing fonts, etc.
+        raise ImageDescriptionError(f"could not rasterise SVG: {exc}") from exc
+
+    try:
+        import pymupdf
+    except ImportError:
+        try:
+            import fitz as pymupdf  # older PyMuPDF releases
+        except ImportError as exc:
+            raise ImageDescriptionError(
+                "SVG support needs a renderer. Run: pip install pymupdf "
+                "(or pip install cairosvg)."
+            ) from exc
+
+    try:
+        with pymupdf.open(stream=data, filetype="svg") as doc:
+            page = doc[0]
+            if not page.rect.width:
+                raise ImageDescriptionError("SVG has no drawable area")
+            zoom = width / page.rect.width
+            pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False)
+            return pixmap.tobytes("png")
+    except ImageDescriptionError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - malformed SVG
+        raise ImageDescriptionError(f"could not rasterise SVG: {exc}") from exc
+
+
+def prepare_payload(data: bytes, name: str) -> tuple[bytes, str]:
+    """Validate and, if needed, rasterise image bytes. Returns (bytes, mime_type).
+
+    `name` is used only for its extension, so this works for bytes pulled
+    straight out of an uploaded DOCX or PDF with no file on disk.
+    """
+    if not data:
+        raise ImageDescriptionError("image is empty")
+
+    if Path(name).suffix.lower() in VECTOR_EXTENSIONS:
+        data = rasterise_svg(data)
+        mime = "image/png"
+    else:
+        mime = mime_type_for(name)
+
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ImageDescriptionError(
+            f"image is {len(data) / 1e6:.1f} MB, over the "
+            f"{MAX_IMAGE_BYTES / 1e6:.0f} MB inline limit"
+        )
+    return data, mime
+
+
+def describe_image_bytes(
+    data: bytes,
+    name: str,
+    model=None,
+    model_name: str | None = None,
+    prompt: str = PROMPT,
+) -> Description:
+    """Describe image bytes that may never have touched the filesystem.
+
+    This is the core call. `describe_image` wraps it for files on disk; the
+    upload pipeline uses it directly for images pulled out of a DOCX or PDF.
+    """
+    payload, mime = prepare_payload(data, name)
+
+    handle = model if model is not None else build_model(model_name)
+    response = handle.generate_content([prompt, {"mime_type": mime, "data": payload}])
+
+    text = (getattr(response, "text", None) or "").strip()
+    if not text:
+        # Usually a safety block or an empty candidate list.
+        feedback = getattr(response, "prompt_feedback", None)
+        raise ImageDescriptionError(f"model returned no text (feedback: {feedback})")
+
+    return Description(
+        text=text,
+        model=getattr(handle, "model_name", model_name or settings.VISION_MODEL_NAME),
     )
 
 
@@ -140,23 +248,6 @@ def describe_image(
     Pass a pre-built `model` when describing many images so the handle is
     reused; otherwise one is built per call.
     """
-    data = path.read_bytes()
-    if not data:
-        raise ImageDescriptionError("file is empty")
-    if len(data) > MAX_IMAGE_BYTES:
-        raise ImageDescriptionError(
-            f"file is {len(data) / 1e6:.1f} MB, over the {MAX_IMAGE_BYTES / 1e6:.0f} MB inline limit"
-        )
-
-    handle = model if model is not None else build_model(model_name)
-    response = handle.generate_content(
-        [prompt, {"mime_type": _mime_type(path), "data": data}]
+    return describe_image_bytes(
+        path.read_bytes(), path.name, model=model, model_name=model_name, prompt=prompt
     )
-
-    text = (getattr(response, "text", None) or "").strip()
-    if not text:
-        # Usually a safety block or an empty candidate list.
-        feedback = getattr(response, "prompt_feedback", None)
-        raise ImageDescriptionError(f"model returned no text (feedback: {feedback})")
-
-    return Description(text=text, model=getattr(handle, "model_name", model_name or settings.VISION_MODEL_NAME))

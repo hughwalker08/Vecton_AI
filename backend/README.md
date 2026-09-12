@@ -118,8 +118,56 @@ Notes:
   with an explicit instruction never to infer a value the figure doesn't show.
   Bump `PROMPT_VERSION` when editing it — it's recorded on every record, so you
   can tell which descriptions predate the change.
-- `describe_image()` is importable, so the XML ingestion pipeline can call it
-  directly once figures are matched to clauses.
+- Corpus figures ship as **SVG**, which no vision model reads directly. They are
+  rasterised to PNG first (PyMuPDF, no native cairo needed) at 1600 px wide —
+  rendering at native size makes the dimension text unreadable, and a misread
+  digit is the worst failure this pipeline has.
+- `describe_image()` (path) and `describe_image_bytes()` (bytes, no file needed)
+  are both importable. The ingestion pipeline and the upload endpoint use them.
+
+### Where descriptions are used
+
+Two consumers, both wired up:
+
+**1. Corpus ingestion — figure chunks.** Without a description, a figure chunk's
+`text` is just its caption, which embeds to almost nothing: *"Figure 11.2.2:
+Stair riser and going dimensions"* does not contain the riser height. The ingest
+pipeline folds the transcription into `text` beneath the caption.
+
+```bash
+# generate once, per corpus (keyed by the filename in <img src="..."/>)
+python scripts/describe_images.py ../ncc-2025-volume-two-v1.2/images     --out app/ingest/output/vol2_image_descriptions.jsonl
+
+# ingest picks up app/ingest/output/{vol2,housing}_image_descriptions.jsonl
+python -m app.ingest.cli
+```
+
+Ingest needs **no API key** — it reads the store if present and reports how many
+matched figures still lack a description. Point it elsewhere with
+`--image-descriptions <path…>`, or generate missing ones inline with
+`--describe-missing-images` (that one does need a key, and costs a call per
+figure). Stores are kept per corpus because Volume Two and the Housing
+Provisions reuse figure filenames.
+
+**2. User uploads — drawings inside submitted documents.** `POST /api/upload/`
+extracts embedded images from a PDF or DOCX and transcribes each one, so a
+submitted plan set's dimensions and annotations come back as text:
+
+```
+POST /api/upload/?describe_images=true&max_images=25
+  -> { images_found, images_skipped, images_described, images_failed,
+       truncated, images: [{ name, source, description, error }] }
+```
+
+DOCX images are read straight out of the zip (`word/media/`) with stdlib
+`zipfile`; PDF images come from PyMuPDF, de-duplicated by xref so a logo
+repeated on forty pages costs one call. Images below 8 KB or 200 px on the short
+side are treated as decorative (letterheads, bullet glyphs) and skipped — they
+carry no compliance content and would each cost an API call. One image failing
+doesn't sink the upload; the error lands on that finding and the rest continue.
+
+Text extraction from uploads is still **not** implemented — that half waits on
+LlamaParse sign-off. The image half is independent of it.
 
 ## Decisions locked in
 
@@ -129,12 +177,17 @@ Notes:
   `gemini-2.5-flash`) — `services/image_description.py` + `scripts/describe_images.py`
 - **PDF parsing:** LlamaParse (external API; needs client sign-off) — `services/`/`api/routes/upload.py`
 - DOCX parsing stays local via `python-docx`
+- **Image extraction from uploads:** PyMuPDF for PDF, stdlib `zipfile` for DOCX —
+  `services/document_images.py`. PyMuPDF also rasterises corpus SVG figures.
 
 ## Not yet implemented
 
-- XML ingestion of NCC/ABCB corpus into chunks
 - Embedding (Gemini `text-embedding-004`) — provider decided, not wired up
 - Hybrid retrieval + reranking
 - LLM generation with citations (Gemini)
-- PDF/DOCX upload parsing (LlamaParse for PDF, `python-docx` for DOCX) — not wired up
+- Upload **text** parsing (LlamaParse for PDF, `python-docx` for DOCX) — not wired
+  up. Upload **image** extraction and transcription *is* implemented.
 - Document-to-requirement analysis
+- Loading ingest output into Postgres — the pipeline writes JSON only, and no
+  database has been provisioned yet (`DATABASE_URL` in `.env.example` is still a
+  placeholder; there is no `.env` in the repo).
