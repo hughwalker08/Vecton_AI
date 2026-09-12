@@ -14,7 +14,12 @@ export async function askQuestion(question, jurisdiction) {
   })
 
   if (!res.ok) {
-    throw new Error(`Chat request failed: ${res.status}`)
+    // FastAPI's HTTPException body is {"detail": "..."} -- e.g. the 429
+    // quota message from app/api/routes/chat.py. fetch() doesn't throw on
+    // HTTP error statuses on its own, so without this the caller would
+    // silently treat this error body as a normal ChatResponse.
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.detail || `Request failed (${res.status})`)
   }
 
   return res.json()

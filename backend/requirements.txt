@@ -12,6 +12,7 @@ lxml>=5.0
 
 # Provider decisions (locked in):
 google-generativeai>=0.8      # Gemini embeddings (text-embedding-004) + generation
+google-genai>=0.3              # Gemini generation (new unified SDK, `from google import genai`)
 llama-parse>=0.5              # external PDF parsing API (client sign-off required)
 
 # PyMuPDF does double duty: it extracts embedded images from uploaded PDFs

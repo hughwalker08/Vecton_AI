@@ -53,7 +53,7 @@ export default function ChatPage({ jurisdiction }) {
       const errorMessage = {
         id: Date.now() + 1,
         role: 'assistant',
-        text: 'Unable to contact the backend. Please try again. Lorem ipsum dolor sit amet consectetur adipisicing elit. Illum libero quis beatae qui. Et atque maxime dolore inventore velit omnis?',
+        text: error.message || 'Unable to contact the backend. Please try again.',
       }
 
       setMessages((currentMessages) => [
