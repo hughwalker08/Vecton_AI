@@ -6,13 +6,7 @@ export default function ChatPage() {
   const [question, setQuestion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [citations, setCitations] = useState([])
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      role: 'assistant',
-      text: 'Ask a construction compliance question to begin.',
-    },
-  ])
+  const [messages, setMessages] = useState([])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -56,7 +50,7 @@ export default function ChatPage() {
       const errorMessage = {
         id: Date.now() + 1,
         role: 'assistant',
-        text: 'Unable to contact the backend. Please try again.',
+        text: 'Unable to contact the backend. Please try again. Lorem ipsum dolor sit amet consectetur adipisicing elit. Illum libero quis beatae qui. Et atque maxime dolore inventore velit omnis?',
       }
 
       setMessages((currentMessages) => [
@@ -73,18 +67,6 @@ export default function ChatPage() {
   return (
     <main className="chat-page">
       <section className="chat-container">
-        <header className="chat-header">
-          <div>
-            <p className="chat-eyebrow">Vecton AI</p>
-
-            <h1>Construction Compliance Assistant</h1>
-
-            <p className="chat-subtitle">
-              Ask questions about construction requirements and review supporting sources.
-            </p>
-          </div>
-        </header>
-
         <div className="chat-content">
           <section className="conversation-panel">
             {messages.map((message) => (
@@ -96,10 +78,6 @@ export default function ChatPage() {
                     : 'assistant-message'
                 }`}
               >
-                <span className="message-label">
-                  {message.role === 'user' ? 'You' : 'Assistant'}
-                </span>
-
                 <p>{message.text}</p>
               </div>
             ))}
