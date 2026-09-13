@@ -13,6 +13,8 @@ if they came from the same model, task type and dimensionality.
     .embedded.json files).
 """
 
+from __future__ import annotations
+
 import re
 
 from google import genai

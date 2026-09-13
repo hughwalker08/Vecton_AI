@@ -13,6 +13,12 @@ node_modules/
 dist/
 .vite/
 
+# Test coverage output (backend pytest-cov + frontend Vitest)
+.coverage
+coverage.xml
+htmlcov/
+frontend/coverage/
+
 # Editors / OS
 .vscode/
 .idea/
