@@ -1,7 +1,18 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import Sidebar from './Sidebar.jsx'
+
+// Sidebar's sign-out button calls supabase.auth.signOut() -- stub it out
+// rather than hitting the real client (see src/App.test.jsx for the same
+// pattern against the fuller Supabase surface App.jsx uses).
+vi.mock('../lib/supabase.js', () => ({
+  supabase: {
+    auth: {
+      signOut: vi.fn(),
+    },
+  },
+}))
 
 function renderSidebar(props = {}, { route = '/' } = {}) {
   return render(
@@ -111,10 +122,14 @@ describe('Sidebar', () => {
     // The toggle is mobile-only (Sidebar.css hides it above 940px, and
     // jsdom's default viewport is wider than that) -- it's still in the DOM
     // and its onClick fires the same regardless, so { hidden: true } finds
-    // it without needing to fake a narrow viewport. It's the only button in
-    // the sidebar, so role alone identifies it (its accessible name doesn't
-    // resolve cleanly through the hidden-element name computation here).
-    const toggle = screen.getByRole('button', { hidden: true })
+    // it without needing to fake a narrow viewport. It's no longer the only
+    // button in the sidebar (the sign-out button also renders here), and its
+    // accessible name doesn't resolve cleanly through the hidden-element
+    // name computation when queried directly -- so grab every button with
+    // hidden:true and pick the one with the toggle's aria-label instead.
+    const toggle = screen
+      .getAllByRole('button', { hidden: true })
+      .find((button) => button.getAttribute('aria-label') === 'Open menu')
 
     expect(toggle).toHaveAttribute('aria-label', 'Open menu')
     expect(toggle).toHaveAttribute('aria-expanded', 'false')

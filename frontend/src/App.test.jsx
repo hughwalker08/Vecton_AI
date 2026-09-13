@@ -83,7 +83,7 @@ describe('App', () => {
       render(<App />)
 
       expect(
-        await screen.findByRole('heading', { name: /select your state \/ region/i }),
+        await screen.findByRole('heading', { name: /select your state or territory/i }),
       ).toBeInTheDocument()
     },
   )

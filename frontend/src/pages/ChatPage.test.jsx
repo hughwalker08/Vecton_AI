@@ -13,7 +13,12 @@ function renderChatPage({ jurisdiction = 'NSW', route = '/chat/abc', state } = {
   return render(
     <MemoryRouter initialEntries={[{ pathname: route, state }]}>
       <Routes>
-        <Route path="/chat/:chatId" element={<ChatPage jurisdiction={jurisdiction} />} />
+        {/* defaultJurisdiction, not a jurisdiction prop directly -- ChatPage
+            resolves jurisdiction per-chat (from the chats list, falling
+            back to route state, then this default). None of these tests
+            pass a chats list or state.jurisdiction, so the default is what
+            actually reaches askQuestion. */}
+        <Route path="/chat/:chatId" element={<ChatPage defaultJurisdiction={jurisdiction} />} />
       </Routes>
     </MemoryRouter>
   )
@@ -24,10 +29,18 @@ beforeEach(() => {
 })
 
 describe('ChatPage', () => {
-  it('sends the typed question and renders the answer with citations', async () => {
+  it('sends the typed question and renders the answer with citations, opening the source panel on click', async () => {
     askQuestion.mockResolvedValue({
       answer: 'Footings must comply with H1D4.',
-      citations: [{ clause_id: 'H1D4', doc: 'NCC 2025 Volume Two', source_url: 'https://x/H1D4' }],
+      citations: [
+        {
+          clause_id: 'H1D4',
+          doc: 'NCC 2025 Volume Two',
+          source_url: null,
+          heading: 'Footings',
+          text: 'Footings must be designed to transfer loads to the ground.',
+        },
+      ],
       abstained: false,
     })
     renderChatPage()
@@ -39,8 +52,18 @@ describe('ChatPage', () => {
 
     expect(await screen.findByText('What are the footing requirements?')).toBeInTheDocument()
     expect(await screen.findByText('Footings must comply with H1D4.')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /H1D4/i })).toHaveAttribute('href', 'https://x/H1D4')
     expect(askQuestion).toHaveBeenCalledWith('What are the footing requirements?', 'NSW')
+
+    // Citations don't carry a source_url (nothing in the corpus populates
+    // one yet -- see backend/app/models/clause_chunk.py), so they're
+    // buttons that open the in-app source panel rather than links.
+    const citationButton = screen.getByRole('button', { name: /H1D4/i })
+    fireEvent.click(citationButton)
+
+    expect(await screen.findByText('Footings')).toBeInTheDocument()
+    expect(
+      screen.getByText('Footings must be designed to transfer loads to the ground.'),
+    ).toBeInTheDocument()
   })
 
   it('sends the message on Enter, but not on Shift+Enter', async () => {
@@ -68,12 +91,15 @@ describe('ChatPage', () => {
     fireEvent.submit(field.closest('form'))
 
     expect(field).toHaveValue('')
-    expect(await screen.findByText('Thinking…')).toBeInTheDocument()
+    // The loading indicator cycles through stage text (retrieving ->
+    // reranking -> generating) rather than a static "Thinking..." -- only
+    // the first stage is visible this soon after submit.
+    expect(await screen.findByText('Retrieving relevant clauses…')).toBeInTheDocument()
 
     resolveAnswer({ answer: 'Done.', citations: [], abstained: false })
 
     expect(await screen.findByText('Done.')).toBeInTheDocument()
-    expect(screen.queryByText('Thinking…')).not.toBeInTheDocument()
+    expect(screen.queryByText('Retrieving relevant clauses…')).not.toBeInTheDocument()
   })
 
   it('shows the abstain note when the backend abstains', async () => {
