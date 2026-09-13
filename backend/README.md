@@ -61,6 +61,13 @@ Runs the suite under `tests/` and prints a coverage report (config in
 `pyproject.toml`); also writes `coverage.xml` for CI. `ruff check app tests`
 runs the linter.
 
+`tests/test_migrations.py`'s chain-integrity checks always run; its
+upgrade/downgrade round-trip test needs a real, **disposable** Postgres +
+pgvector database (a CI service container, or a local throwaway one) --
+point `TEST_DATABASE_URL` at it to run that test, otherwise it's skipped.
+Never point it at a real dev database: the test migrates to head, then
+back down to base again, dropping every table these migrations own.
+
 ## Structure
 
 ```
