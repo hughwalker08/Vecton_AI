@@ -31,7 +31,9 @@ export default function LoginPage() {
   return (
     <main className="login-page">
       <div className="login-card">
-        <div className="login-brand">Vecton</div>
+        <div className="login-brand">
+          Vecton <span className="accent">AI</span>
+        </div>
 
         <h1>Construction Compliance Assistant</h1>
 
@@ -46,7 +48,7 @@ export default function LoginPage() {
           onClick={handleGoogleLogin}
           disabled={isLoading}
         >
-          {isLoading ? 'Signing in...' : 'Continue with Google'}
+          {isLoading ? 'Signing in…' : 'Continue with Google'}
         </button>
 
         {error && <p className="login-error">{error}</p>}

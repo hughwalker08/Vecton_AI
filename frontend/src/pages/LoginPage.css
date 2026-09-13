@@ -1,70 +1,154 @@
+/* LoginPage.css — uses the same tokens as the chat page */
+
 .login-page {
+  position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: #f5f6f8;
+  overflow: hidden;
+  background: var(--paper, #fff);
+  color: var(--ink, #1b1a18);
+  font-family: var(--sans, sans-serif);
+}
+
+/* the warm wash that sits behind the greeting on the chat screen.
+   the 78vh cap is what keeps it from being clipped at the top edge
+   on short viewports — it always fades out before it gets there. */
+.login-page::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  /* wider than the card so the wash actually reads around it, and capped
+     against viewport height so it still fades out before the top edge */
+  width: min(1000px, 140vw, 80vh);
+  aspect-ratio: 1;
+  transform: translate(-50%, -65%);
+  background: radial-gradient(
+    circle,
+    rgba(240, 90, 34, 0.45),
+    rgba(240, 90, 34, 0.34) 24%,
+    rgba(240, 90, 34, 0.16) 44%,
+    rgba(240, 90, 34, 0.04) 60%,
+    rgba(240, 90, 34, 0) 70%
+  );
+  pointer-events: none;
 }
 
 .login-card {
+  position: relative;
   width: 100%;
-  max-width: 440px;
-  padding: 48px 40px;
-  background: #ffffff;
-  border: 1px solid #e4e7ec;
-  border-radius: 16px;
+  max-width: 460px;
+  padding: 52px 44px 44px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--rule, #e6e3dd);
+  border-radius: 20px;
   text-align: center;
-  box-shadow: 0 12px 32px rgba(16, 24, 40, 0.08);
+  box-shadow:
+    var(--shadow-lift, 0 1px 2px rgba(27, 26, 24, 0.05)),
+    0 28px 64px -26px rgba(240, 90, 34, 0.28);
 }
 
+/* wordmark, same weight and family as the sidebar */
 .login-brand {
-  margin-bottom: 20px;
-  font-size: 18px;
+  margin: 0 0 26px;
+  font-family: var(--sans, sans-serif);
+  font-size: 19px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  letter-spacing: -0.015em;
+  line-height: 1;
+  text-transform: none;
+  color: var(--ink, #1b1a18);
+}
+
+.login-brand .accent {
+  color: var(--accent, #f05a22);
 }
 
 .login-card h1 {
   margin: 0;
-  font-size: 28px;
-  line-height: 1.25;
+  font-family: var(--serif, 'Newsreader', Georgia, serif);
+  font-size: clamp(30px, 4.4vw, 38px);
+  font-weight: 500;
+  line-height: 1.14;
+  letter-spacing: -0.015em;
+  color: var(--ink, #1b1a18);
 }
 
 .login-description {
-  margin: 16px 0 32px;
-  color: #667085;
-  line-height: 1.6;
+  margin: 16px auto 32px;
+  max-width: 34ch;
+  color: var(--muted, #8d8880);
+  font-size: 15px;
+  line-height: 1.62;
 }
 
 .google-login-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   width: 100%;
-  padding: 14px 20px;
-  border: 1px solid #d0d5dd;
-  border-radius: 10px;
-  background: #ffffff;
-  color: #101828;
+  padding: 15px 22px;
+  border: none;
+  border-radius: 999px;
+  background: var(--accent, #f05a22);
+  color: #fff;
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 8px 20px -8px rgba(240, 90, 34, 0.55);
   transition:
-    background 0.2s ease,
-    border-color 0.2s ease;
+    filter 0.14s,
+    box-shadow 0.14s,
+    transform 0.14s;
 }
 
 .google-login-button:hover:not(:disabled) {
-  background: #f9fafb;
-  border-color: #98a2b3;
+  filter: brightness(1.06);
+  box-shadow: 0 12px 26px -10px rgba(240, 90, 34, 0.6);
+}
+
+.google-login-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.google-login-button:focus-visible {
+  outline: 2px solid var(--accent, #f05a22);
+  outline-offset: 3px;
 }
 
 .google-login-button:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
-  opacity: 0.6;
+  box-shadow: none;
+}
+
+.google-login-button svg,
+.google-login-button img {
+  flex: none;
+  width: 18px;
+  height: 18px;
 }
 
 .login-error {
-  margin-top: 16px;
-  color: #b42318;
+  margin-top: 18px;
+  color: #b3261e;
   font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  .login-card {
+    padding: 40px 24px 32px;
+    border-radius: 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .google-login-button {
+    transition: none;
+  }
 }
