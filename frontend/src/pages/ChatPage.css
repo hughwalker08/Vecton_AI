@@ -93,14 +93,16 @@
   border: 1px solid var(--rule, #e6e3dd);
   border-radius: 8px;
   padding: 5px 10px;
+  font: inherit;
   font-size: 12.5px;
   color: var(--ink-2, #4b4741);
   background: var(--surface, #fff);
   text-decoration: none;
+  cursor: pointer;
   transition: border-color 0.14s, color 0.14s;
 }
 
-a.src-chip:hover {
+.src-chip:hover {
   border-color: var(--accent, #f05a22);
   color: var(--ink, #1b1a18);
 }

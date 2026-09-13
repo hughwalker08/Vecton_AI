@@ -59,6 +59,15 @@ class Citation(BaseModel):
     clause_id: str
     doc: str
     source_url: str | None = None
+    # Populated from the same chunk dict app.services.generation._format_chunk
+    # reads from -- carried through so the frontend's source panel can show
+    # the clause without a second round trip.
+    heading: str | None = None
+    text: str | None = None
+    building_classes: list[str] | None = None
+    jurisdictions: list[str] | None = None
+    climate_zones: list[int] | None = None
+    applicability_note: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -77,7 +86,17 @@ def _citations_from(chunks: list[dict]) -> list[Citation]:
             continue
         seen.add((clause_id, doc))
         citations.append(
-            Citation(clause_id=clause_id, doc=doc or "", source_url=chunk.get("source_url"))
+            Citation(
+                clause_id=clause_id,
+                doc=doc or "",
+                source_url=chunk.get("source_url"),
+                heading=chunk.get("heading"),
+                text=chunk.get("text"),
+                building_classes=chunk.get("building_classes"),
+                jurisdictions=chunk.get("jurisdictions"),
+                climate_zones=chunk.get("climate_zones"),
+                applicability_note=chunk.get("applicability_note"),
+            )
         )
     return citations
 

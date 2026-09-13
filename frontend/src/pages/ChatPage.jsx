@@ -1,17 +1,47 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { askQuestion } from '../api/client.js'
+import SourcePanel from '../components/SourcePanel.jsx'
 import './ChatPage.css'
+
+// Each chat request chains several backend calls (embed -> hybrid search ->
+// rerank -> generate) that can together take 10+ seconds, with the rerank
+// step in particular prone to cold-start delay on Hugging Face's free
+// Inference API. A static "Thinking..." reads as stuck at that latency, so
+// cycle through what's actually happening instead. This is a client-side
+// approximation (the backend returns one response, not per-stage events) --
+// timings are tuned to roughly track the real pipeline, not measured live.
+const LOADING_STAGES = [
+  'Retrieving relevant clauses…',
+  'Reranking results…',
+  'Generating your answer…',
+]
+const LOADING_STAGE_INTERVAL_MS = 2500
 
 export default function ChatPage({ jurisdiction }) {
   const [question, setQuestion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [loadingStage, setLoadingStage] = useState(0)
   const [messages, setMessages] = useState([])
+  const [openCitation, setOpenCitation] = useState(null)
   const { chatId } = useParams()
   const location = useLocation()
   const startedChatId = useRef(null)
   const fieldRef = useRef(null)
   const scrollRef = useRef(null)
+
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingStage(0)
+      return
+    }
+
+    const interval = setInterval(() => {
+      setLoadingStage((stage) => Math.min(stage + 1, LOADING_STAGES.length - 1))
+    }, LOADING_STAGE_INTERVAL_MS)
+
+    return () => clearInterval(interval)
+  }, [isLoading])
 
   async function sendMessage(trimmedQuestion) {
     if (!trimmedQuestion) {
@@ -31,6 +61,7 @@ export default function ChatPage({ jurisdiction }) {
 
     setQuestion('')
     if (fieldRef.current) fieldRef.current.style.height = 'auto'
+    setOpenCitation(null)
     setIsLoading(true)
 
     try {
@@ -146,30 +177,18 @@ export default function ChatPage({ jurisdiction }) {
                 {message.citations?.length > 0 && (
                   <div className="srcs">
                     <span className="k">Sources</span>
-                    {message.citations.map((citation, index) =>
-                      citation.source_url ? (
-                        <a
-                          key={`${citation.doc}-${citation.clause_id}-${index}`}
-                          className="src-chip"
-                          href={citation.source_url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <i>{index + 1}</i>
-                          {citation.doc}
-                          {citation.clause_id ? ` · ${citation.clause_id}` : ''}
-                        </a>
-                      ) : (
-                        <span
-                          key={`${citation.doc}-${citation.clause_id}-${index}`}
-                          className="src-chip"
-                        >
-                          <i>{index + 1}</i>
-                          {citation.doc}
-                          {citation.clause_id ? ` · ${citation.clause_id}` : ''}
-                        </span>
-                      ),
-                    )}
+                    {message.citations.map((citation, index) => (
+                      <button
+                        key={`${citation.doc}-${citation.clause_id}-${index}`}
+                        type="button"
+                        className="src-chip"
+                        onClick={() => setOpenCitation(citation)}
+                      >
+                        <i>{index + 1}</i>
+                        {citation.doc}
+                        {citation.clause_id ? ` · ${citation.clause_id}` : ''}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -179,7 +198,7 @@ export default function ChatPage({ jurisdiction }) {
           {isLoading && (
             <div className="thought">
               <span className="spin" />
-              Thinking…
+              {LOADING_STAGES[loadingStage]}
             </div>
           )}
         </div>
@@ -212,6 +231,8 @@ export default function ChatPage({ jurisdiction }) {
           </div>
         </form>
       </div>
+
+      <SourcePanel citation={openCitation} onClose={() => setOpenCitation(null)} />
     </main>
   )
 }
