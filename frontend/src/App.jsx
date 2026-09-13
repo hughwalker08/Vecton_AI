@@ -18,11 +18,11 @@ export default function App() {
   const [chats, setChats] = useState([])
   const [uploadedFiles, setUploadedFiles] = useState([])
 
-  function createChat(question) {
+  function createChat(question, jurisdiction) {
     const id = crypto.randomUUID()
     const title = question.length > 60 ? `${question.slice(0, 57)}…` : question
 
-    setChats((currentChats) => [{ id, title }, ...currentChats])
+    setChats((currentChats) => [{ id, title, jurisdiction }, ...currentChats])
 
     return id
   }
@@ -108,10 +108,13 @@ export default function App() {
 
         <div className="app-main">
           <Routes>
-            <Route path="/" element={<HomePage onStartChat={createChat} />} />
+            <Route
+              path="/"
+              element={<HomePage onStartChat={createChat} defaultJurisdiction={profile.jurisdiction} />}
+            />
             <Route
 		path="/chat/:chatId"
-		element={<ChatPage jurisdiction={profile.jurisdiction} />}
+		element={<ChatPage chats={chats} defaultJurisdiction={profile.jurisdiction} />}
 	    />
             <Route
               path="/upload"

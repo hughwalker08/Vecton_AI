@@ -18,7 +18,7 @@ const LOADING_STAGES = [
 ]
 const LOADING_STAGE_INTERVAL_MS = 2500
 
-export default function ChatPage({ jurisdiction }) {
+export default function ChatPage({ chats = [], defaultJurisdiction }) {
   const [question, setQuestion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [loadingStage, setLoadingStage] = useState(0)
@@ -29,6 +29,17 @@ export default function ChatPage({ jurisdiction }) {
   const startedChatId = useRef(null)
   const fieldRef = useRef(null)
   const scrollRef = useRef(null)
+
+  // Each chat picks its jurisdiction once, in the home page composer, when
+  // it's created (see App.jsx's createChat / HomePage.jsx) -- not a global
+  // per-user default. location.state carries it on the very first render
+  // right after creation, before the chats list has necessarily re-rendered
+  // with the new entry; the chats-list lookup is what a revisited chat
+  // (opened from the sidebar, no location.state) resolves from.
+  const jurisdiction =
+    chats.find((chat) => chat.id === chatId)?.jurisdiction ||
+    location.state?.jurisdiction ||
+    defaultJurisdiction
 
   useEffect(() => {
     if (!isLoading) {

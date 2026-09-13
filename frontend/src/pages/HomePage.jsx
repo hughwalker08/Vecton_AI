@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AUSTRALIAN_JURISDICTIONS } from '../lib/jurisdictions.js'
 import './HomePage.css'
 
 const SUGGESTIONS = [
@@ -16,17 +17,18 @@ function getGreeting() {
   return 'Good evening'
 }
 
-export default function HomePage({ onStartChat }) {
+export default function HomePage({ onStartChat, defaultJurisdiction }) {
   const [question, setQuestion] = useState('')
+  const [jurisdiction, setJurisdiction] = useState(defaultJurisdiction || '')
   const navigate = useNavigate()
   const fieldRef = useRef(null)
 
   function startChat(text) {
     const trimmed = text.trim()
-    if (!trimmed) return
+    if (!trimmed || !jurisdiction) return
 
-    const chatId = onStartChat(trimmed)
-    navigate(`/chat/${chatId}`, { state: { initialQuestion: trimmed } })
+    const chatId = onStartChat(trimmed, jurisdiction)
+    navigate(`/chat/${chatId}`, { state: { initialQuestion: trimmed, jurisdiction } })
   }
 
   function handleSubmit(event) {
@@ -73,7 +75,37 @@ export default function HomePage({ onStartChat }) {
             onKeyDown={handleKeyDown}
           />
           <div className="tools">
-            <button type="submit" className="send" aria-label="Ask" disabled={!question.trim()}>
+            <label className="tool jurisdiction-picker">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 21s7-6.1 7-11.5A7 7 0 0 0 5 9.5C5 14.9 12 21 12 21Z"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <circle cx="12" cy="9.5" r="2.2" stroke="currentColor" strokeWidth="1.6" />
+              </svg>
+              <select
+                value={jurisdiction}
+                onChange={(event) => setJurisdiction(event.target.value)}
+                aria-label="Jurisdiction for this chat"
+              >
+                <option value="" disabled>
+                  Select state / territory
+                </option>
+                {AUSTRALIAN_JURISDICTIONS.map((item) => (
+                  <option key={item.code} value={item.code}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              className="send"
+              aria-label="Ask"
+              disabled={!question.trim() || !jurisdiction}
+            >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <path
                   d="M4.5 12h13m-5-5.5 5.5 5.5-5.5 5.5"
