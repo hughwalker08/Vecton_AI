@@ -17,6 +17,8 @@ dimensions and annotations come back as text. The rest of the pipeline is
 still the original skeleton.
 """
 
+from __future__ import annotations
+
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 

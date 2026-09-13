@@ -13,6 +13,8 @@ Steps 1-3 are app.services.retrieval.retrieve(); step 5 is
 app.services.generation.generate_answer().
 """
 
+from __future__ import annotations
+
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
@@ -22,8 +24,8 @@ from app.services.embedding import EmbeddingError
 from app.services.embedding import QuotaExceededError as EmbeddingQuotaExceeded
 from app.services.generation import GenerationError, generate_answer
 from app.services.generation import QuotaExceededError as GenerationQuotaExceeded
-from app.services.retrieval import RerankError, retrieve
 from app.services.retrieval import QuotaExceededError as RerankQuotaExceeded
+from app.services.retrieval import RerankError, retrieve
 
 router = APIRouter()
 

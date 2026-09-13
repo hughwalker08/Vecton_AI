@@ -14,11 +14,14 @@ an empty list falls back to answering from the question alone (no corpus
 grounding), which the system instruction is written to refuse to do.
 """
 
+from __future__ import annotations
+
 import re
 
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
+from pydantic import ValidationError
 
 from app.core.config import settings
 
@@ -108,7 +111,19 @@ _HTTP_OPTIONS = types.HttpOptions(timeout=30_000, retry_options=_RETRY_OPTIONS)
 # thinking_budget here raises 400 INVALID_ARGUMENT), and the budget below
 # leaves real headroom for a multi-clause answer on top of it.
 _MAX_OUTPUT_TOKENS = 4096
-_THINKING_CONFIG = types.ThinkingConfig(thinking_level="low")
+try:
+    _THINKING_CONFIG = types.ThinkingConfig(thinking_level="low")
+except ValidationError:
+    # TESTING NOTE (found while adding Phase 0 test scaffolding): the
+    # installed google-genai SDK (checked up to 1.47.0, the latest on PyPI)
+    # doesn't expose thinking_level on ThinkingConfig yet, so building this
+    # at import time raised pydantic's "extra_forbidden" and crashed the
+    # entire app before it could even serve /health. Falling back to no
+    # thinking config keeps the app importable; whoever owns generation.py
+    # should follow up on the real fix (SDK upgrade, or the dict-based
+    # config path) once one exists -- this is not a fix for the underlying
+    # MAX_TOKENS truncation issue described above.
+    _THINKING_CONFIG = None
 
 
 class GenerationError(Exception):

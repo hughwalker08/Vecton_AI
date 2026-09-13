@@ -1,0 +1,22 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --cov=app --cov-report=term-missing --cov-report=xml"
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "app/ingest/cli.py",
+    "app/ingest/output/*",
+]
+
+[tool.ruff]
+# 100 was this file's own arbitrary starting point (Phase 0); the existing
+# app/ code -- dense, deliberately-informative docstrings and comments,
+# written before any linter was wired up -- mostly overflows it. 120 fits
+# nearly all of it without reformatting prose that isn't ours to rewrite;
+# see the couple of remaining >120 lines fixed alongside this change.
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

@@ -14,6 +14,18 @@ npm install
 npm run dev
 ```
 
+## Tests
+
+```bash
+npm test              # run once
+npm run test:watch    # re-run on change
+npm run test:coverage # with a coverage report
+```
+
+Uses Vitest + React Testing Library, jsdom environment (config in
+`vite.config.js`'s `test` block). Tests live next to the code they cover
+(`Component.test.jsx`).
+
 ## Structure
 
 ```

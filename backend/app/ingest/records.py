@@ -8,7 +8,7 @@ writes, no embeddings. The ChunkRecord shape mirrors the eventual
 `text`, and upsert directly.
 """
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Optional
 
 

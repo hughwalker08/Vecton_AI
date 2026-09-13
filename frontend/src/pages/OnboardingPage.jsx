@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { AUSTRALIAN_JURISDICTIONS } from '../lib/jurisdictions.js'
+import './OnboardingPage.css'
 
 export default function OnboardingPage({ userId, onComplete }) {
   const [jurisdiction, setJurisdiction] = useState('')
@@ -37,43 +38,52 @@ export default function OnboardingPage({ userId, onComplete }) {
   }
 
   return (
-    <main>
-      <h1>Select your State / Region</h1>
+    <main className="onboarding-page">
+      <div className="onboarding-card">
+        <div className="onboarding-brand">
+          Vecton <span className="accent">AI</span>
+        </div>
 
-      <p>
-        This will be used to provide construction compliance information
-        relevant to your jurisdiction.
-      </p>
+        <h1>Select your state or territory</h1>
 
-      <form onSubmit={handleSubmit}>
-        <label htmlFor="jurisdiction">
-          Australian State / Territory
-        </label>
+        <p className="onboarding-description">
+          Answers will be drawn from the codes and regulations that apply in
+          your jurisdiction.
+        </p>
 
-        <select
-          id="jurisdiction"
-          value={jurisdiction}
-          onChange={(event) => setJurisdiction(event.target.value)}
-          disabled={isSaving}
-        >
-          <option value="">Select a state or territory</option>
+        <form onSubmit={handleSubmit}>
+          <label className="onboarding-field" htmlFor="jurisdiction">
+            Australian state or territory
+          </label>
 
-          {AUSTRALIAN_JURISDICTIONS.map((item) => (
-            <option key={item.code} value={item.code}>
-              {item.name} ({item.code})
-            </option>
-          ))}
-        </select>
+          <select
+            id="jurisdiction"
+            className="jurisdiction-select"
+            data-empty={jurisdiction === ''}
+            value={jurisdiction}
+            onChange={(event) => setJurisdiction(event.target.value)}
+            disabled={isSaving}
+          >
+            <option value="">Select a state or territory</option>
 
-        <button
-          type="submit"
-          disabled={isSaving || !jurisdiction}
-        >
-          {isSaving ? 'Saving...' : 'Continue'}
-        </button>
-      </form>
+            {AUSTRALIAN_JURISDICTIONS.map((item) => (
+              <option key={item.code} value={item.code}>
+                {item.name} ({item.code})
+              </option>
+            ))}
+          </select>
 
-      {error && <p>{error}</p>}
+          <button
+            type="submit"
+            className="onboarding-submit"
+            disabled={isSaving || !jurisdiction}
+          >
+            {isSaving ? 'Saving…' : 'Continue'}
+          </button>
+        </form>
+
+        {error && <p className="onboarding-error">{error}</p>}
+      </div>
     </main>
   )
 }

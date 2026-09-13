@@ -9,12 +9,15 @@ Run locally with:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.routes import chat, health, upload
 from app.core.config import settings
-from app.api.routes import chat, upload, health
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="AI-powered assistant for NSW construction compliance research (NCC 2025 Vol. 2 + ABCB Housing Provisions).",
+    description=(
+        "AI-powered assistant for NSW construction compliance research "
+        "(NCC 2025 Vol. 2 + ABCB Housing Provisions)."
+    ),
     version="0.1.0",
 )
 

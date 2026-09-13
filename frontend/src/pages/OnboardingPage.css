@@ -1,0 +1,189 @@
+/* OnboardingPage.css — same shell as the login page, form-shaped */
+
+.onboarding-page {
+    position: relative;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    overflow: hidden;
+    background: var(--paper, #fff);
+    color: var(--ink, #1b1a18);
+    font-family: var(--sans, sans-serif);
+  }
+  
+  .onboarding-page::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(1000px, 140vw, 80vh);
+    aspect-ratio: 1;
+    transform: translate(-50%, -65%);
+    background: radial-gradient(
+      circle,
+      rgba(240, 90, 34, 0.45),
+      rgba(240, 90, 34, 0.34) 24%,
+      rgba(240, 90, 34, 0.16) 44%,
+      rgba(240, 90, 34, 0.04) 60%,
+      rgba(240, 90, 34, 0) 70%
+    );
+    pointer-events: none;
+  }
+  
+  .onboarding-card {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    padding: 52px 44px 44px;
+    background: var(--surface, #fff);
+    border: 1px solid var(--rule, #e6e3dd);
+    border-radius: 20px;
+    box-shadow:
+      var(--shadow-lift, 0 1px 2px rgba(27, 26, 24, 0.05)),
+      0 28px 64px -26px rgba(240, 90, 34, 0.28);
+  }
+  
+  .onboarding-brand {
+    margin: 0 0 26px;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1;
+    text-align: center;
+    color: var(--ink, #1b1a18);
+  }
+  
+  .onboarding-brand .accent {
+    color: var(--accent, #f05a22);
+  }
+  
+  .onboarding-card h1 {
+    margin: 0;
+    font-family: var(--serif, 'Newsreader', Georgia, serif);
+    font-size: clamp(28px, 4vw, 34px);
+    font-weight: 500;
+    line-height: 1.16;
+    letter-spacing: -0.015em;
+    text-align: center;
+    color: var(--ink, #1b1a18);
+  }
+  
+  .onboarding-description {
+    margin: 14px auto 30px;
+    max-width: 36ch;
+    color: var(--muted, #8d8880);
+    font-size: 15px;
+    line-height: 1.62;
+    text-align: center;
+  }
+  
+  .onboarding-field {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink-2, #4b4741);
+  }
+  
+  .jurisdiction-select {
+    width: 100%;
+    height: 48px;
+    padding: 0 42px 0 15px;
+    appearance: none;
+    border: 1px solid var(--rule, #e6e3dd);
+    border-radius: 12px;
+    background-color: var(--surface, #fff);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1.5 1.75 6 6.25l4.5-4.5' stroke='%238d8880' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 16px center;
+    font-family: var(--sans, sans-serif);
+    font-size: 15px;
+    color: var(--ink, #1b1a18);
+    cursor: pointer;
+    transition:
+      border-color 0.14s,
+      box-shadow 0.14s;
+  }
+  
+  /* the placeholder option, while nothing is chosen */
+  .jurisdiction-select:invalid,
+  .jurisdiction-select[data-empty='true'] {
+    color: var(--muted, #8d8880);
+  }
+  
+  .jurisdiction-select:hover:not(:disabled) {
+    border-color: var(--accent-mid, rgba(240, 90, 34, 0.22));
+  }
+  
+  .jurisdiction-select:focus {
+    outline: none;
+    border-color: var(--accent, #f05a22);
+    box-shadow: 0 0 0 3px var(--accent-soft, rgba(240, 90, 34, 0.1));
+  }
+  
+  .jurisdiction-select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  
+  .onboarding-submit {
+    width: 100%;
+    margin-top: 20px;
+    padding: 15px 22px;
+    border: none;
+    border-radius: 999px;
+    background: var(--accent, #f05a22);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 8px 20px -8px rgba(240, 90, 34, 0.55);
+    transition:
+      filter 0.14s,
+      box-shadow 0.14s,
+      transform 0.14s,
+      opacity 0.14s;
+  }
+  
+  .onboarding-submit:hover:not(:disabled) {
+    filter: brightness(1.06);
+    box-shadow: 0 12px 26px -10px rgba(240, 90, 34, 0.6);
+  }
+  
+  .onboarding-submit:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  
+  .onboarding-submit:focus-visible {
+    outline: 2px solid var(--accent, #f05a22);
+    outline-offset: 3px;
+  }
+  
+  .onboarding-submit:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+  
+  .onboarding-error {
+    margin: 16px 0 0;
+    color: #b3261e;
+    font-size: 14px;
+  }
+  
+  @media (max-width: 768px) {
+    .onboarding-card {
+      padding: 40px 24px 32px;
+      border-radius: 18px;
+    }
+  }
+  
+  @media (prefers-reduced-motion: reduce) {
+    .onboarding-submit,
+    .jurisdiction-select {
+      transition: none;
+    }
+  }
