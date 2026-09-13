@@ -25,6 +25,31 @@ describe('Sidebar', () => {
     expect(screen.getByText('No questions yet')).toBeInTheDocument()
   })
 
+  it('shows "No documents yet" when no files have been uploaded', () => {
+    renderSidebar({ files: [] })
+
+    expect(screen.getByText('No documents yet')).toBeInTheDocument()
+  })
+
+  it('lists uploaded documents, each linking back to the upload page', () => {
+    renderSidebar({
+      files: [
+        { id: 1, name: 'plan.pdf', status: 'done' },
+        { id: 2, name: 'certificate.docx', status: 'uploading' },
+      ],
+    })
+
+    const planLink = screen.getByRole('link', { name: 'plan.pdf' })
+    expect(planLink).toHaveAttribute('href', '/upload')
+    expect(screen.getByRole('link', { name: 'certificate.docx' })).toHaveAttribute('href', '/upload')
+  })
+
+  it('flags a failed upload in the documents list', () => {
+    renderSidebar({ files: [{ id: 1, name: 'broken.pdf', status: 'error' }] })
+
+    expect(screen.getByRole('link', { name: 'broken.pdf' })).toHaveClass('doc-error')
+  })
+
   it('lists each chat as a link to its chat page', () => {
     renderSidebar({
       chats: [

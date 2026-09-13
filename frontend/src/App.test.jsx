@@ -20,9 +20,10 @@ vi.mock('./lib/supabase.js', () => ({
 
 vi.mock('./api/client.js', () => ({
   askQuestion: vi.fn(),
+  uploadDocument: vi.fn(),
 }))
 
-import { askQuestion } from './api/client.js'
+import { askQuestion, uploadDocument } from './api/client.js'
 import { supabase } from './lib/supabase.js'
 
 function mockSignedOut() {
@@ -120,6 +121,22 @@ describe('App', () => {
 
     fireEvent.click(await screen.findByRole('link', { name: /upload documents/i }))
 
-    expect(await screen.findByRole('heading', { name: 'Upload Project Documents' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Project files' })).toBeInTheDocument()
+  })
+
+  it('a document uploaded on the upload page also shows up in the sidebar', async () => {
+    mockSignedIn()
+    uploadDocument.mockResolvedValue({ status: 'processed 1 image(s) from plan.pdf' })
+
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('link', { name: /upload documents/i }))
+    const file = new File(['%PDF-1.4'], 'plan.pdf', { type: 'application/pdf' })
+    fireEvent.change(document.querySelector('input[type="file"]'), { target: { files: [file] } })
+
+    // Sidebar's "Documents" section reads the same uploadedFiles state as
+    // the upload page itself -- both should show the new file.
+    expect(await screen.findAllByText('plan.pdf')).toHaveLength(2)
+    expect(await screen.findByText('processed 1 image(s) from plan.pdf')).toBeInTheDocument()
   })
 })
