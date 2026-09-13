@@ -45,7 +45,17 @@ def test_ask_question_success_returns_answer_and_citations(client, monkeypatch):
     assert body["answer"] == "Footings must comply with H1D4."
     assert body["abstained"] is False
     assert body["citations"] == [
-        {"clause_id": "H1D4", "doc": "NCC 2025 Volume Two", "source_url": "https://ncc.abcb.gov.au/H1D4"}
+        {
+            "clause_id": "H1D4",
+            "doc": "NCC 2025 Volume Two",
+            "source_url": "https://ncc.abcb.gov.au/H1D4",
+            "heading": None,
+            "text": "Footings must be designed to support the loads.",
+            "building_classes": None,
+            "jurisdictions": None,
+            "climate_zones": None,
+            "applicability_note": None,
+        }
     ]
 
 
