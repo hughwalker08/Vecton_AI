@@ -155,7 +155,10 @@ def run(
     housing_bare_resolved = sum(1 for ref in all_bare_citations if ref.get("chunk_id"))
 
     report = IngestReport(
-        corpora={corpus.name: build_corpus_report(corpus.doc_label, chunks_by_corpus[corpus.name]) for corpus in corpora},
+        corpora={
+            corpus.name: build_corpus_report(corpus.doc_label, chunks_by_corpus[corpus.name])
+            for corpus in corpora
+        },
         images_matched=images_matched_total,
         images_unmatched=images_unmatched_total,
         figures_described=figures_described_total,
@@ -180,7 +183,10 @@ def run(
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data-dir", type=Path, default=REPO_ROOT, help="Directory containing both ncc-2025-*-v1.2 folders")
+    parser.add_argument(
+        "--data-dir", type=Path, default=REPO_ROOT,
+        help="Directory containing both ncc-2025-*-v1.2 folders",
+    )
     parser.add_argument("--volume-two-source", type=Path, default=None)
     parser.add_argument("--housing-source", type=Path, default=None)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)

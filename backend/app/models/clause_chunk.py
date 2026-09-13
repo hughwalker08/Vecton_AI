@@ -14,7 +14,7 @@ Embedding: Gemini `text-embedding-004`, 768-dim (settings.EMBEDDING_DIM).
 """
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Column, Computed, DateTime, Integer, JSON, String, Text
+from sqlalchemy import JSON, Column, Computed, DateTime, Integer, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.sql import func
 
