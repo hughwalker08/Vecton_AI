@@ -6,6 +6,9 @@ Schema history:
   0001  base table + pgvector `embedding` column + hnsw cosine index
   0002  typed references, applicability qualifiers, node_type
         (covers the client's citation/traceability requirements)
+  0003  text_tsv generated column + GIN index (lexical half of retrieval)
+  0004  user_profiles table (separate; does not touch this model)
+  0005  image_refs
 
 Embedding: Gemini `text-embedding-004`, 768-dim (settings.EMBEDDING_DIM).
 """
@@ -45,7 +48,14 @@ class ClauseChunk(Base):
     internal_refs = Column(JSONB)
     # Hand-offs to documents OUTSIDE the corpus (Australian Standards etc.).
     # [{"standard": "AS 3600", "clause": "8.1.3", "title": "Concrete structures"}]
+    # Loaded from the ingest pipeline's `external_refs` -- same data; the names
+    # differ because ingest also emits non-standard kinds (vol1, vol3, housing,
+    # livable).
     standard_refs = Column(JSONB)
+
+    # Figures this chunk references, from the ingest pipeline (migration 0005).
+    # [{"image_id": "<uuid>", "filename": "figure_11_2_2.svg", "caption": "..."}]
+    image_refs = Column(JSONB)
 
     # --- applicability qualifiers ---
     # NULL means "no restriction on this axis" (applies to all).
