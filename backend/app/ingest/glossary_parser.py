@@ -1,4 +1,5 @@
-"""Glossary entries: `<glossentry category=.. id="_GUID"><glossterm/><glossdef><content>...</content></glossdef></glossentry>`."""
+"""Glossary entries: `<glossentry category=.. id="_GUID">
+<glossterm/><glossdef><content>...</content></glossdef></glossentry>`."""
 
 from app.ingest.chunker import render_content
 from app.ingest.hierarchy import ancestor_path

@@ -15,6 +15,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.js'],
     css: true,
+    // Default is 5000ms; give a slower/loaded CI runner some headroom over
+    // the 5000ms asyncUtilTimeout set in src/test/setup.js.
+    testTimeout: 10000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],

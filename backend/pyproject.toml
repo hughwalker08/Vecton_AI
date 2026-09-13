@@ -10,7 +10,12 @@ omit = [
 ]
 
 [tool.ruff]
-line-length = 100
+# 100 was this file's own arbitrary starting point (Phase 0); the existing
+# app/ code -- dense, deliberately-informative docstrings and comments,
+# written before any linter was wired up -- mostly overflows it. 120 fits
+# nearly all of it without reformatting prose that isn't ours to rewrite;
+# see the couple of remaining >120 lines fixed alongside this change.
+line-length = 120
 target-version = "py39"
 
 [tool.ruff.lint]
