@@ -1,0 +1,67 @@
+# Render Blueprint for Vecton AI Construction Compliance Assistant.
+#
+# Deploy: in the Render dashboard, "New +" -> "Blueprint" -> pick this repo.
+# Render will read this file and propose the two services below for you to
+# review before creating anything.
+#
+# Secrets (DATABASE_URL, GEMINI_API_KEY, HF_API_TOKEN, Supabase keys) are
+# marked `sync: false` below, which tells Render "this var exists but must be
+# entered by hand in the dashboard" -- they are never stored in this file or
+# committed to git.
+#
+# Service names below determine the *.onrender.com hostnames. If either name
+# is already taken on Render, it'll get a suffix instead -- if so, update
+# VITE_API_BASE_URL on the frontend service to match the backend's real URL
+# and redeploy.
+
+services:
+  - type: web
+    name: vecton-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      # Supabase Postgres connection string (Project Settings > Database >
+      # Connection string > URI, "Transaction" pooler mode recommended).
+      - key: DATABASE_URL
+        sync: false
+      # Gemini key for embeddings, generation, and image transcription.
+      - key: GEMINI_API_KEY
+        sync: false
+      # Hugging Face Inference token for the retrieval reranker
+      # (BAAI/bge-reranker-base) -- required, retrieval.py raises without it.
+      - key: HF_API_TOKEN
+        sync: false
+      # Must match whatever model produced the stored corpus embeddings
+      # (see backend/app/ingest/output/embeddings/*.meta.json: "gemini-embedding-2").
+      # Do NOT change this without re-embedding the corpus.
+      - key: EMBEDDING_MODEL_NAME
+        value: gemini-embedding-2
+      - key: LLM_MODEL_NAME
+        value: gemini-3.6-flash
+      - key: VISION_MODEL_NAME
+        value: gemini-2.5-flash
+      # Wide open for now -- tighten to the frontend's exact URL once known
+      # (Settings -> Environment on this service), e.g.
+      # ["https://vecton-frontend.onrender.com"]
+      - key: CORS_ORIGINS
+        value: '["*"]'
+
+  - type: web
+    name: vecton-frontend
+    runtime: static
+    rootDir: frontend
+    plan: free
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      # Update if the backend's actual assigned hostname differs (see note
+      # at the top of this file).
+      - key: VITE_API_BASE_URL
+        value: https://vecton-backend.onrender.com/api
