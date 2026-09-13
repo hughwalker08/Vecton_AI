@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
+import { supabase } from '../lib/supabase.js'
 import './Sidebar.css'
 
 function getInitials(email) {
@@ -20,6 +21,13 @@ export default function Sidebar({ chats = [], files = [], userEmail }) {
 
   function closeMenu() {
     setIsOpen(false)
+  }
+
+  async function handleSignOut() {
+    // App.jsx's supabase.auth.onAuthStateChange listener clears session/
+    // profile and swaps back to LoginPage once this resolves -- no local
+    // state to reset here.
+    await supabase.auth.signOut()
   }
 
   const filteredChats = useMemo(() => {
@@ -160,10 +168,34 @@ export default function Sidebar({ chats = [], files = [], userEmail }) {
 
         <div className="nav-foot">
           <div className="avatar">{getInitials(userEmail)}</div>
-          <div>
+          <div className="who-role">
             <div className="who">{userEmail || 'Signed in'}</div>
             <div className="role">Compliance assistant</div>
           </div>
+          <button
+            type="button"
+            className="sign-out"
+            onClick={handleSignOut}
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M15 4.5H7.5A1.5 1.5 0 0 0 6 6v12a1.5 1.5 0 0 0 1.5 1.5H15"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M10.5 12h9m0 0-3-3m3 3-3 3"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
         </div>
       </aside>
     </>
