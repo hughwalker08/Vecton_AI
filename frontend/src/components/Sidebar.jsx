@@ -8,7 +8,7 @@ function getInitials(email) {
   return name.slice(0, 2).toUpperCase()
 }
 
-export default function Sidebar({ chats = [], userEmail }) {
+export default function Sidebar({ chats = [], files = [], userEmail }) {
   const { chatId: activeChatId } = useParams()
   const location = useLocation()
   const [isOpen, setIsOpen] = useState(false)
@@ -111,6 +111,32 @@ export default function Sidebar({ chats = [], userEmail }) {
         </div>
 
         <nav className="tree">
+          <div className="tree-label">Documents</div>
+          {files.length === 0 ? (
+            <p className="tree-empty">No documents yet</p>
+          ) : (
+            files.map((doc) => (
+              <Link
+                key={doc.id}
+                to="/upload"
+                className={`recent doc ${doc.status === 'error' ? 'doc-error' : ''}`}
+                title={doc.name}
+                onClick={closeMenu}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M6.5 3.5h7L18 8v12.5H6.5V3.5Z"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                  <path d="M13.2 3.6V8H18" stroke="currentColor" strokeWidth="1.6" />
+                </svg>
+                <span className="doc-name">{doc.name}</span>
+              </Link>
+            ))
+          )}
+
           <div className="tree-label">Earlier questions</div>
           {filteredChats.length === 0 ? (
             <p className="tree-empty">

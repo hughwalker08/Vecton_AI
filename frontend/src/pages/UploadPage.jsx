@@ -22,8 +22,7 @@ function formatDate(date) {
 
 let nextId = 1
 
-export default function UploadPage() {
-  const [files, setFiles] = useState([])
+export default function UploadPage({ files, setFiles }) {
   const [isDragging, setIsDragging] = useState(false)
   const inputRef = useRef(null)
 
