@@ -16,6 +16,7 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true)
   const [isProfileLoading, setIsProfileLoading] = useState(false)
   const [chats, setChats] = useState([])
+  const [uploadedFiles, setUploadedFiles] = useState([])
 
   function createChat(question) {
     const id = crypto.randomUUID()
@@ -103,7 +104,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="app-shell">
-        <Sidebar chats={chats} userEmail={session.user?.email} />
+        <Sidebar chats={chats} files={uploadedFiles} userEmail={session.user?.email} />
 
         <div className="app-main">
           <Routes>
@@ -112,7 +113,10 @@ export default function App() {
 		path="/chat/:chatId"
 		element={<ChatPage jurisdiction={profile.jurisdiction} />}
 	    />
-            <Route path="/upload" element={<UploadPage />} />
+            <Route
+              path="/upload"
+              element={<UploadPage files={uploadedFiles} setFiles={setUploadedFiles} />}
+            />
           </Routes>
         </div>
       </div>
