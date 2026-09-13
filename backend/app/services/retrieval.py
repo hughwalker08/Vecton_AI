@@ -17,6 +17,8 @@ Two stages:
 `retrieve()` runs both stages and is the entry point callers should use.
 """
 
+from __future__ import annotations
+
 import httpx
 
 from app.core.config import settings
