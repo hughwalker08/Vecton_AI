@@ -83,4 +83,22 @@ describe('uploadDocument', () => {
 
     await expect(uploadDocument(new File(['x'], 'a.pdf'))).resolves.toEqual(body)
   })
+
+  it('throws the backend detail message when the response is not ok', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(fakeResponse({ ok: false, status: 400, body: { detail: 'Uploaded file is empty.' } }))
+    )
+
+    await expect(uploadDocument(new File([], 'empty.pdf'))).rejects.toThrow('Uploaded file is empty.')
+  })
+
+  it('falls back to a generic message when the error body has no detail', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 503, json: () => Promise.reject(new Error('not json')) })
+    )
+
+    await expect(uploadDocument(new File(['x'], 'a.pdf'))).rejects.toThrow('Upload failed (503)')
+  })
 })
