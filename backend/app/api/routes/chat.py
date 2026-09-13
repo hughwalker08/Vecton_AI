@@ -13,6 +13,8 @@ Steps 1-3 are app.services.retrieval.retrieve(); step 5 is
 app.services.generation.generate_answer().
 """
 
+from __future__ import annotations
+
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException

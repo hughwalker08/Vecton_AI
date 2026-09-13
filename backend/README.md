@@ -50,6 +50,17 @@ uvicorn app.main:app --reload
 
 API docs will be available at http://localhost:8000/docs
 
+## Tests
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+pytest
+```
+
+Runs the suite under `tests/` and prints a coverage report (config in
+`pyproject.toml`); also writes `coverage.xml` for CI. `ruff check app tests`
+runs the linter.
+
 ## Structure
 
 ```
