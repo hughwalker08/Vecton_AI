@@ -1,0 +1,19 @@
+/* Shared design tokens, lifted from design-mockups/compliance-rag-ui.html
+   so the real chat UI matches the approved mockup. */
+:root {
+  --paper: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #faf9f7;
+  --hover: #f4f2ee;
+  --ink: #1b1a18;
+  --ink-2: #4b4741;
+  --muted: #8d8880;
+  --rule: #e6e3dd;
+  --rule-soft: #f0ede7;
+  --accent: #f05a22;
+  --accent-soft: rgba(240, 90, 34, 0.1);
+  --accent-mid: rgba(240, 90, 34, 0.22);
+  --shadow-lift: 0 1px 2px rgba(27, 26, 24, 0.05), 0 12px 32px -12px rgba(27, 26, 24, 0.16);
+  --sans: 'Figtree', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --serif: 'Newsreader', Georgia, 'Times New Roman', serif;
+}
