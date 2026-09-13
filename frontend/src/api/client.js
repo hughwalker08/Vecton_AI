@@ -32,5 +32,14 @@ export async function uploadDocument(file) {
     method: 'POST',
     body: formData,
   })
+
+  if (!res.ok) {
+    // Same reasoning as askQuestion() above: FastAPI's error body is
+    // {"detail": "..."} (bad file type, corrupt file, vision provider not
+    // configured, etc.) and fetch() won't throw on its own for this.
+    const body = await res.json().catch(() => null)
+    throw new Error(body?.detail || `Upload failed (${res.status})`)
+  }
+
   return res.json()
 }
