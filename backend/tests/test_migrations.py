@@ -121,6 +121,7 @@ def migration_test_db(monkeypatch):
         with engine.connect() as conn:
             # Reset to a clean slate in case a previous interrupted run left
             # things half-migrated -- makes repeated local runs idempotent.
+            conn.execute(sa.text("DROP TABLE IF EXISTS public.compliance_feedback CASCADE"))
             conn.execute(sa.text("DROP TABLE IF EXISTS public.user_profiles CASCADE"))
             conn.execute(sa.text("DROP TABLE IF EXISTS public.clause_chunks CASCADE"))
             conn.execute(sa.text("DROP TABLE IF EXISTS public.alembic_version"))
@@ -155,6 +156,7 @@ def test_upgrade_to_head_then_downgrade_to_base_round_trips_cleanly(migration_te
     tables = inspector.get_table_names(schema="public")
     assert "clause_chunks" in tables
     assert "user_profiles" in tables
+    assert "compliance_feedback" in tables  # 0006
     columns = {c["name"] for c in inspector.get_columns("clause_chunks", schema="public")}
     assert "text_tsv" in columns  # 0003
     assert "image_refs" in columns  # 0005
@@ -164,3 +166,4 @@ def test_upgrade_to_head_then_downgrade_to_base_round_trips_cleanly(migration_te
     tables = inspector.get_table_names(schema="public")
     assert "clause_chunks" not in tables
     assert "user_profiles" not in tables
+    assert "compliance_feedback" not in tables

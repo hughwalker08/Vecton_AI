@@ -9,7 +9,7 @@ Run locally with:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import chat, health, upload
+from app.api.routes import chat, compliance, health, upload
 from app.core.config import settings
 
 app = FastAPI(
@@ -33,6 +33,7 @@ app.add_middleware(
 app.include_router(health.router, tags=["health"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
+app.include_router(compliance.router, prefix="/api/compliance", tags=["compliance"])
 
 
 @app.get("/")
