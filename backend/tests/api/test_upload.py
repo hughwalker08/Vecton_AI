@@ -25,7 +25,13 @@ def _upload(client, filename="plan.pdf", data=_PDF_BYTES, **params):
 
 def _report(**overrides):
     base = dict(
-        filename="plan.pdf", images_found=0, images_skipped=0, described=0, failed=0, findings=[]
+        filename="plan.pdf",
+        images_found=0,
+        images_skipped=0,
+        described=0,
+        failed=0,
+        captioned=0,
+        findings=[],
     )
     base.update(overrides)
     return DocumentImageReport(**base)
@@ -84,14 +90,47 @@ def test_upload_reports_described_images(client, monkeypatch):
             "source": "plan.pdf#1",
             "description": "A stair section.",
             "error": None,
+            "caption": None,
+            "caption_source": None,
         },
         {
             "name": "fig2.svg",
             "source": "plan.pdf#2",
             "description": None,
             "error": "unreadable image",
+            "caption": None,
+            "caption_source": None,
         },
     ]
+
+
+def test_upload_reports_captions_and_their_source(client, monkeypatch):
+    """A caption and how it was found both reach the caller.
+
+    caption_source is the difference between a label the document's author
+    wrote and one inferred from where text sat on the page, which is what a
+    reviewer needs to know before trusting the association.
+    """
+    findings = [
+        ImageFinding(
+            name="img1.png",
+            source="word/media/image1.png",
+            description="A subfloor vent detail.",
+            caption="Figure 12: Subfloor ventilation detail",
+            caption_source="caption-style",
+        ),
+        ImageFinding(name="img2.png", source="word/media/image2.png", description="A logo."),
+    ]
+    report = _report(images_found=2, described=2, captioned=1, findings=findings)
+    monkeypatch.setattr(upload, "describe_document_images", lambda *a, **k: report)
+
+    body = _upload(client).json()
+
+    assert body["images_captioned"] == 1
+    assert body["images"][0]["caption"] == "Figure 12: Subfloor ventilation detail"
+    assert body["images"][0]["caption_source"] == "caption-style"
+    assert body["images"][1]["caption"] is None
+    assert body["images"][1]["caption_source"] is None
 
 
 def test_upload_status_when_no_images_are_transcribable(client, monkeypatch):
