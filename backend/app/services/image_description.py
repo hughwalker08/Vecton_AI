@@ -208,12 +208,39 @@ def prepare_payload(data: bytes, name: str) -> tuple[bytes, str]:
     return data, mime
 
 
+CONTEXT_TEMPLATE = """
+
+The document this image came from labels it:
+
+    {caption}
+
+That label is context from the surrounding document, NOT text printed on the
+image. Use it to interpret what you are looking at, but do not transcribe it
+into ## Labels and annotations or ## Figure unless the same text is actually
+visible in the image itself."""
+
+
+def with_caption(prompt: str, caption: str | None) -> str:
+    """Append a caption to the prompt as clearly-external context.
+
+    Worth doing: a caption like "Figure 12: Subfloor ventilation detail" tells
+    the model what it is looking at, which measurably helps on a drawing that
+    would otherwise be ambiguous. Worth fencing: the prompt's core rule is
+    "transcribe only what is visible", and a caption pasted in unqualified
+    invites the model to report it as printed text that isn't there.
+    """
+    if not caption or not caption.strip():
+        return prompt
+    return prompt + CONTEXT_TEMPLATE.format(caption=caption.strip())
+
+
 def describe_image_bytes(
     data: bytes,
     name: str,
     model=None,
     model_name: str | None = None,
     prompt: str = PROMPT,
+    caption: str | None = None,
 ) -> Description:
     """Describe image bytes that may never have touched the filesystem.
 
@@ -223,7 +250,9 @@ def describe_image_bytes(
     payload, mime = prepare_payload(data, name)
 
     handle = model if model is not None else build_model(model_name)
-    response = handle.generate_content([prompt, {"mime_type": mime, "data": payload}])
+    response = handle.generate_content(
+        [with_caption(prompt, caption), {"mime_type": mime, "data": payload}]
+    )
 
     text = (getattr(response, "text", None) or "").strip()
     if not text:

@@ -29,6 +29,13 @@ Migrations:
 - `0002_refs_applicability_node_type` — `node_type`; typed refs (`internal_refs`,
   `standard_refs`); applicability qualifiers (`building_classes`, `jurisdictions`,
   `climate_zones`, `applicability_note`) with GIN indexes.
+- `0003_fulltext_tsvector` — `text_tsv` generated column + GIN index (lexical
+  half of hybrid retrieval).
+- `0004_user_profiles` — `user_profiles`, linked to Supabase Auth, with RLS.
+- `0005_image_refs` — `image_refs` on `clause_chunks` (figure citations).
+- `0006_compliance_feedback` — `compliance_feedback`: a flat log for flagging a
+  compliance_analysis finding as wrongly classified (see
+  `app/services/compliance_analysis.py`).
 
 Schema covers the client's citation requirements: specific clause id
 (`clause_id`) + containment (`hierarchy`), source document (`doc`), verbatim
@@ -77,9 +84,9 @@ app/
   db/session.py       # SQLAlchemy engine/session (Postgres + pgvector)
   models/             # SQLAlchemy models (clause_chunk.py so far)
   schemas/            # (reserved for shared Pydantic schemas)
-  services/           # embedding.py, retrieval.py, generation.py (stubs)
-                      # image_description.py (implemented)
-  api/routes/         # health.py, chat.py, upload.py
+  services/           # embedding.py, retrieval.py, generation.py,
+                      # image_description.py, compliance_analysis.py
+  api/routes/         # health.py, chat.py, upload.py, compliance.py
 scripts/              # describe_images.py — batch NCC/ABCB figure transcription
 data/images/          # drop NCC/ABCB figures here (gitignored)
 data/image_descriptions/  # generated descriptions (gitignored)
@@ -205,7 +212,10 @@ LlamaParse sign-off. The image half is independent of it.
 - LLM generation with citations (Gemini)
 - Upload **text** parsing (LlamaParse for PDF, `python-docx` for DOCX) — not wired
   up. Upload **image** extraction and transcription *is* implemented.
-- Document-to-requirement analysis
+- Document-to-requirement analysis — the engine itself is implemented
+  (`app/services/compliance_analysis.py`, `POST /api/compliance/analyse`), but
+  it takes already-extracted document text directly rather than a file, since
+  upload text parsing (above) isn't wired up yet to feed it
 - Loading ingest output into Postgres — the pipeline writes JSON only, and no
   database has been provisioned yet (`DATABASE_URL` in `.env.example` is still a
   placeholder; there is no `.env` in the repo).

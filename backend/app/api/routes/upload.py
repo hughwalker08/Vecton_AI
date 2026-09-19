@@ -5,7 +5,8 @@ Intended flow (see planning doc, Part B - User document uploads):
     1. Accept a PDF or DOCX file.
     2a. Parse to text - DOCX via python-docx, PDF via LlamaParse
         (settings.PDF_PARSER, settings.LLAMAPARSE_API_KEY).   NOT IMPLEMENTED
-    2b. Extract embedded images and transcribe each one.      IMPLEMENTED
+    2b. Extract embedded images, match each to its caption in the
+        document, and transcribe it.                          IMPLEMENTED
     3. Chunk and embed (Gemini text-embedding-004) the same way as the
        ingested NCC/ABCB corpus.                              NOT IMPLEMENTED
     4. Analyse against applicable provisions, producing categorised findings.
@@ -13,8 +14,14 @@ Intended flow (see planning doc, Part B - User document uploads):
 
 Step 2b is live: uploaded drawings are run through the same vision service
 that transcribes the NCC/ABCB corpus figures, so a submitted plan set's
-dimensions and annotations come back as text. The rest of the pipeline is
-still the original skeleton.
+dimensions and annotations come back as text, anchored to the caption the
+document gave them ("Figure 12: Subfloor ventilation detail"). The caption is
+what lets a description be tied back to the requirement it is evidence for.
+
+Text extraction (2a) is still the original skeleton -- see the parsing plan
+in the wiki. When it lands, image descriptions get spliced into the extracted
+text at their anchor points and the whole thing feeds
+services/compliance_analysis.analyse_document().
 """
 
 from __future__ import annotations
@@ -42,6 +49,12 @@ class ImageFindingResponse(BaseModel):
     source: str
     description: str | None = None
     error: str | None = None
+    # What the document called this drawing, when it could be matched.
+    caption: str | None = None
+    # How it was matched: "alt-text" and "caption-style" are authored by the
+    # document's writer; "caption-pattern" and "nearby-text" are inferred from
+    # position, so a reviewer should weigh them accordingly.
+    caption_source: str | None = None
 
 
 class UploadResponse(BaseModel):
@@ -52,6 +65,7 @@ class UploadResponse(BaseModel):
     images_skipped: int = 0
     images_described: int = 0
     images_failed: int = 0
+    images_captioned: int = 0
     truncated: bool = False
     images: list[ImageFindingResponse] = []
 
@@ -100,12 +114,18 @@ async def upload_document(
     response.images_skipped = report.images_skipped
     response.images_described = report.described
     response.images_failed = report.failed
+    response.images_captioned = report.captioned
     response.truncated = (
         report.images_found - report.images_skipped
     ) > len(report.findings)
     response.images = [
         ImageFindingResponse(
-            name=f.name, source=f.source, description=f.description, error=f.error
+            name=f.name,
+            source=f.source,
+            description=f.description,
+            error=f.error,
+            caption=f.caption,
+            caption_source=f.caption_source,
         )
         for f in report.findings
     ]

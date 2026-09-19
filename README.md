@@ -46,6 +46,6 @@ npm run dev
 - [ ] Build hybrid retrieval (vector + BM25 + RRF) and reranker
 - [ ] Wire chat endpoint to retrieval + generation, with citations/abstention
 - [x] Decide PDF parser — **LlamaParse**; implement upload pipeline
-- [ ] Document-to-requirement analysis (findings: missing / contradicted / addressed / needs review)
+- [x] Document-to-requirement analysis (findings: missing / contradicted / addressed / needs review) — `POST /api/compliance/analyse`; takes extracted document text directly until upload text-extraction is wired up
 - [ ] Frontend: chat UI with citation view, upload UI with findings display
 - [ ] Deploy to Render

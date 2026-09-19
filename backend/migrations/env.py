@@ -17,6 +17,7 @@ from app.db.session import Base
 
 # Import model modules for their side effect of registering tables on Base.
 import app.models.clause_chunk  # noqa: F401
+import app.models.compliance_feedback  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
