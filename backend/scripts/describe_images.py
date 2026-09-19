@@ -229,7 +229,8 @@ def _is_rate_limit(exc: Exception) -> bool:
     )
 
 
-def transcribe(path: Path, label: str, model, attempts: int) -> dict:
+def transcribe(path: Path, label: str, model, attempts: int, caption: str | None = None,
+               caption_in_image: bool = False) -> dict:
     """Describe one image, retrying transient failures. Returns a result dict."""
     started = time.monotonic()
     last_error = ""
@@ -238,7 +239,8 @@ def transcribe(path: Path, label: str, model, attempts: int) -> dict:
     for attempt in range(1, attempts + 1):
         made = attempt
         try:
-            result = describe_image(path, model=model)
+            result = describe_image(path, model=model, caption=caption,
+                                    caption_in_image=caption_in_image)
             return {
                 "ok": True,
                 "image": label,
@@ -246,6 +248,7 @@ def transcribe(path: Path, label: str, model, attempts: int) -> dict:
                 "description": result.text,
                 "model": result.model,
                 "prompt_version": result.prompt_version,
+                "caption": caption,
                 "chars": len(result.text),
                 "attempts": attempt,
                 "seconds": round(time.monotonic() - started, 1),
@@ -344,6 +347,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="process only the images that failed on the previous run")
     p.add_argument("--preview-lines", type=int, default=3,
                    help="lines of each fresh description to echo, 0 to disable (default: 3)")
+    p.add_argument("--captions", type=Path, default=None,
+                   help="JSON map of {image file name: caption}, e.g. the captions.json "
+                        "written by scripts/extract_pdf_figures.py. The caption is passed "
+                        "to the model as context and recorded on each output row.")
+    p.add_argument("--caption-in-image", action="store_true",
+                   help="the caption is printed inside the image (true for crops from "
+                        "scripts/extract_pdf_figures.py) -- tells the model to record it "
+                        "under ## Figure rather than treat it as external context")
     p.add_argument("--dry-run", action="store_true",
                    help="list what would be processed; make no API calls")
     return p.parse_args(argv)
@@ -371,6 +382,14 @@ def main(argv: list[str] | None = None) -> int:
         print(dim("Drop the NCC 2025 Vol 2 / ABCB Housing Provisions figures into "
                   f"{DEFAULT_INPUT} (sub-folders are fine), or pass a folder as an argument."))
         return 1
+
+    captions: dict[str, str] = {}
+    if args.captions:
+        if args.captions.exists():
+            captions = json.loads(args.captions.read_text(encoding="utf-8"))
+            print(f"  loaded {len(captions)} caption(s) from {args.captions}")
+        else:
+            print(yellow(f"  ! captions file not found: {args.captions}"))
 
     out_path = args.out.expanduser().resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -431,7 +450,9 @@ def main(argv: list[str] | None = None) -> int:
     err_fh = errors_path.open("a", encoding="utf-8")
 
     def run(item: tuple[Path, str]) -> dict:
-        return transcribe(item[0], item[1], model, max(1, args.attempts))
+        caption = captions.get(item[0].name) or captions.get(item[1])
+        return transcribe(item[0], item[1], model, max(1, args.attempts), caption,
+                          args.caption_in_image)
 
     try:
         if args.workers > 1:

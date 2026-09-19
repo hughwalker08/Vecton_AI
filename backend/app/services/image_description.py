@@ -219,8 +219,21 @@ image. Use it to interpret what you are looking at, but do not transcribe it
 into ## Labels and annotations or ## Figure unless the same text is actually
 visible in the image itself."""
 
+# When the caption is rendered inside the image -- as it is for figures cropped
+# out of the NCC/ABCB PDFs, where the caption sits at the top of the crop --
+# the fence above makes the model too cautious and it answers "Not shown" under
+# ## Figure. Here the caption is printed text, and should be recorded as such.
+CONTEXT_TEMPLATE_IN_IMAGE = """
 
-def with_caption(prompt: str, caption: str | None) -> str:
+This figure's caption is printed at the top of the image:
+
+    {caption}
+
+Record it under ## Figure exactly as printed. Transcribe the rest of the image
+as normal."""
+
+
+def with_caption(prompt: str, caption: str | None, caption_in_image: bool = False) -> str:
     """Append a caption to the prompt as clearly-external context.
 
     Worth doing: a caption like "Figure 12: Subfloor ventilation detail" tells
@@ -231,7 +244,8 @@ def with_caption(prompt: str, caption: str | None) -> str:
     """
     if not caption or not caption.strip():
         return prompt
-    return prompt + CONTEXT_TEMPLATE.format(caption=caption.strip())
+    template = CONTEXT_TEMPLATE_IN_IMAGE if caption_in_image else CONTEXT_TEMPLATE
+    return prompt + template.format(caption=caption.strip())
 
 
 def describe_image_bytes(
@@ -241,6 +255,7 @@ def describe_image_bytes(
     model_name: str | None = None,
     prompt: str = PROMPT,
     caption: str | None = None,
+    caption_in_image: bool = False,
 ) -> Description:
     """Describe image bytes that may never have touched the filesystem.
 
@@ -251,7 +266,7 @@ def describe_image_bytes(
 
     handle = model if model is not None else build_model(model_name)
     response = handle.generate_content(
-        [with_caption(prompt, caption), {"mime_type": mime, "data": payload}]
+        [with_caption(prompt, caption, caption_in_image), {"mime_type": mime, "data": payload}]
     )
 
     text = (getattr(response, "text", None) or "").strip()
@@ -271,12 +286,16 @@ def describe_image(
     model=None,
     model_name: str | None = None,
     prompt: str = PROMPT,
+    caption: str | None = None,
+    caption_in_image: bool = False,
 ) -> Description:
     """Return a text description of the image at `path`.
 
     Pass a pre-built `model` when describing many images so the handle is
-    reused; otherwise one is built per call.
+    reused; otherwise one is built per call. `caption` is the label the source
+    document gave this figure, passed to the model as fenced external context.
     """
     return describe_image_bytes(
-        path.read_bytes(), path.name, model=model, model_name=model_name, prompt=prompt
+        path.read_bytes(), path.name, model=model, model_name=model_name,
+        prompt=prompt, caption=caption, caption_in_image=caption_in_image,
     )
