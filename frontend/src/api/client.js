@@ -8,13 +8,21 @@
 // e.g. "https://vecton-backend.onrender.com/api".
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
-export async function askQuestion(question, jurisdiction) {
+// Matches backend/app/services/generation.py's MAX_HISTORY_MESSAGES -- kept
+// in sync manually (no shared config between the two apps). Trimming here
+// too, not just server-side, keeps the request body itself small rather
+// than relying on the backend to discard the extra messages after they've
+// already been sent.
+const MAX_HISTORY_MESSAGES = 6
+
+export async function askQuestion(question, jurisdiction, history = []) {
   const res = await fetch(`${BASE_URL}/chat/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       question,
       jurisdiction,
+      history: history.slice(-MAX_HISTORY_MESSAGES),
     }),
   })
 

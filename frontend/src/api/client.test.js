@@ -14,7 +14,7 @@ afterEach(() => {
 })
 
 describe('askQuestion', () => {
-  it('POSTs to /api/chat/ with the question and jurisdiction as JSON', async () => {
+  it('POSTs to /api/chat/ with the question, jurisdiction, and history as JSON', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       fakeResponse({ body: { answer: 'Footings must comply with H1D4.', citations: [], abstained: false } })
     )
@@ -25,8 +25,38 @@ describe('askQuestion', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/chat/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: 'What are the footing requirements?', jurisdiction: 'NSW' }),
+      body: JSON.stringify({
+        question: 'What are the footing requirements?',
+        jurisdiction: 'NSW',
+        history: [],
+      }),
     })
+  })
+
+  it('sends the given history verbatim when under the message cap', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ body: { answer: 'ok', citations: [] } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const history = [
+      { role: 'user', text: 'What ceiling height do we need in bedrooms?' },
+      { role: 'assistant', text: 'Minimum 2.4m per H1D4.' },
+    ]
+
+    await askQuestion('What about NSW?', 'NSW', history)
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).history).toEqual(history)
+  })
+
+  it('trims history to the most recent messages before sending', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ body: { answer: 'ok', citations: [] } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const history = Array.from({ length: 10 }, (_, i) => ({ role: 'user', text: `turn ${i}` }))
+
+    await askQuestion('Q', 'NSW', history)
+
+    const sentHistory = JSON.parse(fetchMock.mock.calls[0][1].body).history
+    expect(sentHistory).toHaveLength(6)
+    expect(sentHistory[0].text).toBe('turn 4') // the 6 most recent, oldest first
+    expect(sentHistory[5].text).toBe('turn 9')
   })
 
   it('resolves with the parsed JSON response on success', async () => {
