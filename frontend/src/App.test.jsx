@@ -109,7 +109,8 @@ describe('App', () => {
     fireEvent.submit(field.closest('form'))
 
     expect(await screen.findByText('Riser height is 190mm max.')).toBeInTheDocument()
-    expect(askQuestion).toHaveBeenCalledWith('What is the max riser height?', 'NSW')
+    // First message in a brand-new chat -- no prior turns yet.
+    expect(askQuestion).toHaveBeenCalledWith('What is the max riser height?', 'NSW', [])
     // The question that started the chat also shows up as the new sidebar entry.
     expect(screen.getByRole('link', { name: 'What is the max riser height?' })).toBeInTheDocument()
   })

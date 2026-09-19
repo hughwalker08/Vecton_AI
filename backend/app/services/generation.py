@@ -12,6 +12,14 @@ inline clause citations. If the chunks don't support an answer, the caller
 `chunks` comes from app.services.retrieval.retrieve() in normal operation;
 an empty list falls back to answering from the question alone (no corpus
 grounding), which the system instruction is written to refuse to do.
+
+Multi-turn: `generate_answer()` optionally takes prior conversation turns
+(`history`) and replays them ahead of the current question, Gemini-chat
+style, so a follow-up like "what about NSW?" is understood in context. This
+only affects generation -- retrieval always searches on the raw current
+question alone (see api/routes/chat.py), since a bare follow-up like that
+retrieves poorly on its own; a query-condensation step is a known future
+improvement, not implemented here.
 """
 
 from __future__ import annotations
@@ -72,7 +80,7 @@ fences, no [link](url) syntax. For a heading or clause label, just write it as i
 followed by a colon (e.g. "Clause H1D4 -- NCC 2025 Volume Two:"). For a list, use a plain dash \
 or number ("- " or "1. ") at the start of the line. For quoted clause text, introduce it with a \
 line like "Clause text:" and put the quote on its own line rather than using a > blockquote. \
-Separate sections and list items with a blank line so they render as distinct paragraphs."""
+Separate sections and list items with a blank line so they render as distinct paragraph"""
 
 # Jurisdiction is collected from the user up front (see api/routes/chat.py:
 # ChatRequest.jurisdiction) and appended here per-request rather than baked
@@ -192,20 +200,64 @@ def _build_user_content(question: str, chunks: list[dict]) -> str:
     return f"CONTEXT:\n{context_block}\n\nQUESTION: {question}"
 
 
-def generate_answer(question: str, chunks: list[dict], jurisdiction: str | None = None) -> str:
+# How many prior turns (user+assistant messages, not exchanges) get replayed
+# ahead of the current question -- the chat-memory equivalent of
+# RETRIEVAL_TOP_K/MIN_RERANK_SCORE in api/routes/chat.py: a first cut, not a
+# hard technical ceiling. Gemini's context window is far bigger than this;
+# the constraint is per-request latency/cost, which scales with how much of
+# the conversation gets re-sent on every turn. Enforced here (not just by the
+# caller) so generate_answer() is safe to call with an unbounded history.
+MAX_HISTORY_MESSAGES = 6
+
+# Gemini's multi-turn roles are "user" and "model" -- not the "assistant"
+# label the frontend/chat.py use (matching OpenAI-style chat conventions).
+_ROLE_TO_GEMINI = {"user": "user", "assistant": "model"}
+
+
+def _history_contents(history: list[dict] | None) -> list[types.Content]:
+    """Prior turns (oldest first) as Gemini Content objects, most recent
+    MAX_HISTORY_MESSAGES only. Each turn is replayed as the plain text the
+    user saw -- the CONTEXT block built by _build_user_content() is only
+    attached to the *current* turn below, not stored per-turn, since the
+    model already generated its earlier answers with that context in view."""
+    if not history:
+        return []
+    trimmed = history[-MAX_HISTORY_MESSAGES:]
+    return [
+        types.Content(role=_ROLE_TO_GEMINI.get(turn["role"], "user"), parts=[types.Part(text=turn["text"])])
+        for turn in trimmed
+        if turn.get("text")
+    ]
+
+
+def generate_answer(
+    question: str,
+    chunks: list[dict],
+    jurisdiction: str | None = None,
+    history: list[dict] | None = None,
+) -> str:
     """Return an LLM-generated answer for the question, grounded in `chunks`.
 
     `jurisdiction` (e.g. "NSW"), when known, is folded into the system
     instruction so the model applies jurisdiction-qualified clauses correctly
     instead of just citing whatever the context happens to contain.
+
+    `history` is prior conversation turns, oldest first, each
+    {"role": "user"|"assistant", "text": str} -- the plain question/answer
+    text as shown in the chat UI, not the retrieval internals. Only the most
+    recent MAX_HISTORY_MESSAGES are replayed; retrieval itself (see
+    api/routes/chat.py) does not use history, only the raw current question.
     """
     client = _get_client()
     user_content = _build_user_content(question, chunks)
+    contents = _history_contents(history) + [
+        types.Content(role="user", parts=[types.Part(text=user_content)])
+    ]
 
     try:
         response = client.models.generate_content(
             model=settings.LLM_MODEL_NAME,
-            contents=user_content,
+            contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction=_build_system_instruction(jurisdiction),
                 temperature=0,
