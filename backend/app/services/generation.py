@@ -16,16 +16,15 @@ grounding), which the system instruction is written to refuse to do.
 
 from __future__ import annotations
 
-import re
-
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 from pydantic import ValidationError
 
 from app.core.config import settings
+from app.services.gemini_keys import call_with_rotation, quota_wait_hint
 
-_client: genai.Client | None = None
+_clients: dict[str, genai.Client] = {}
 
 # Behavioural rules live in the system instruction (sent once per request,
 # separate from the user turn) rather than being concatenated into the
@@ -85,11 +84,28 @@ it names {jurisdiction} — say plainly when a retrieved clause does not apply t
 jurisdiction rather than citing it as if it did, and note when a national requirement is \
 varied or replaced by a {jurisdiction}-specific one."""
 
+# The user can attach their own document to a chat (see api/routes/chat.py's
+# attachment_text) -- a design spec, drawing-set transcription, or building
+# report, extracted client-side via services/document_text.py. It's a second
+# source, not a corpus clause, so it needs an explicit carve-out from "every
+# statement needs a citation": otherwise the model either refuses to use it or
+# mislabels it as a code citation.
+_ATTACHMENT_ADDENDUM = """
 
-def _build_system_instruction(jurisdiction: str | None) -> str:
-    if not jurisdiction:
-        return SYSTEM_INSTRUCTION
-    return SYSTEM_INSTRUCTION + _JURISDICTION_ADDENDUM.format(jurisdiction=jurisdiction)
+The user has attached their own document to this chat, named "{name}" (given to you below as \
+ATTACHED DOCUMENT). You may use it as a second source: describe what it says and compare it \
+against the CONTEXT clauses. Attribute any statement drawn from it to the document by name \
+(e.g. "{name} states..."), never as a code citation — it is evidence about the user's project, \
+not a source for what the code requires. Only CONTEXT establishes what the NCC/ABCB requires."""
+
+
+def _build_system_instruction(jurisdiction: str | None, attachment_name: str | None = None) -> str:
+    instruction = SYSTEM_INSTRUCTION
+    if jurisdiction:
+        instruction += _JURISDICTION_ADDENDUM.format(jurisdiction=jurisdiction)
+    if attachment_name:
+        instruction += _ATTACHMENT_ADDENDUM.format(name=attachment_name)
+    return instruction
 
 # Gemini free/paid tiers both return transient 429/503s under load; retrying
 # a handful of times with backoff avoids surfacing those as user-facing
@@ -134,24 +150,18 @@ class QuotaExceededError(GenerationError):
     """Raised when Gemini's rate limit or daily quota has been used up."""
 
 
-def _quota_wait_hint(exc: Exception) -> str:
-    """Pull a retry delay out of a 429's error body, if one is given."""
-    match = re.search(r"retryDelay['\"]?\s*:\s*['\"]?(\d+)", str(exc))
-    return f" Try again in about {match.group(1)}s." if match else ""
+def _is_quota_error(exc: Exception) -> bool:
+    return isinstance(exc, genai_errors.APIError) and (
+        exc.code == 429 or exc.status == "RESOURCE_EXHAUSTED"
+    )
 
 
-def _get_client() -> genai.Client:
-    global _client
-    if not settings.GEMINI_API_KEY:
-        raise GenerationError(
-            "GEMINI_API_KEY is not set. Copy backend/.env.example to backend/.env "
-            "and fill it in (or export GEMINI_API_KEY)."
-        )
-    if _client is None:
-        # Keep a process-wide client so connection pooling/keep-alive is
-        # reused across requests instead of reconnecting every call.
-        _client = genai.Client(api_key=settings.GEMINI_API_KEY, http_options=_HTTP_OPTIONS)
-    return _client
+def _client_for(key: str) -> genai.Client:
+    # Keep one client per key, process-wide, so connection pooling/keep-alive
+    # is reused across requests instead of reconnecting every call.
+    if key not in _clients:
+        _clients[key] = genai.Client(api_key=key, http_options=_HTTP_OPTIONS)
+    return _clients[key]
 
 
 def _format_chunk(chunk: dict) -> str:
@@ -185,43 +195,73 @@ def _format_chunk(chunk: dict) -> str:
     return "\n".join(lines)
 
 
-def _build_user_content(question: str, chunks: list[dict]) -> str:
-    if not chunks:
-        return f"CONTEXT: (none retrieved)\n\nQUESTION: {question}"
-    context_block = "\n\n".join(_format_chunk(c) for c in chunks)
-    return f"CONTEXT:\n{context_block}\n\nQUESTION: {question}"
+def _build_user_content(
+    question: str,
+    chunks: list[dict],
+    attachment_name: str | None = None,
+    attachment_text: str | None = None,
+) -> str:
+    context_block = "\n\n".join(_format_chunk(c) for c in chunks) if chunks else "(none retrieved)"
+    parts = [f"CONTEXT:\n{context_block}"]
+    if attachment_text:
+        parts.append(f"ATTACHED DOCUMENT ({attachment_name}):\n{attachment_text}")
+    parts.append(f"QUESTION: {question}")
+    return "\n\n".join(parts)
 
 
-def generate_answer(question: str, chunks: list[dict], jurisdiction: str | None = None) -> str:
+def generate_answer(
+    question: str,
+    chunks: list[dict],
+    jurisdiction: str | None = None,
+    attachment_name: str | None = None,
+    attachment_text: str | None = None,
+) -> str:
     """Return an LLM-generated answer for the question, grounded in `chunks`.
 
     `jurisdiction` (e.g. "NSW"), when known, is folded into the system
     instruction so the model applies jurisdiction-qualified clauses correctly
     instead of just citing whatever the context happens to contain.
+
+    `attachment_text`, when given, is a document the user attached to the
+    chat (see api/routes/chat.py) -- a second source, folded into both the
+    user content and the system instruction so the model treats it as
+    project evidence rather than a corpus citation.
     """
-    client = _get_client()
-    user_content = _build_user_content(question, chunks)
+    if not settings.gemini_api_keys:
+        raise GenerationError(
+            "GEMINI_API_KEY is not set. Copy backend/.env.example to backend/.env "
+            "and fill it in (or export GEMINI_API_KEY / GEMINI_API_KEYS)."
+        )
+    attachment_text = (attachment_text or "").strip() or None
+    attachment_label = (attachment_name or "the attached document") if attachment_text else None
+    user_content = _build_user_content(question, chunks, attachment_label, attachment_text)
+
+    def _call(key: str):
+        client = _client_for(key)
+        try:
+            return client.models.generate_content(
+                model=settings.LLM_MODEL_NAME,
+                contents=user_content,
+                config=types.GenerateContentConfig(
+                    system_instruction=_build_system_instruction(jurisdiction, attachment_label),
+                    temperature=0,
+                    max_output_tokens=_MAX_OUTPUT_TOKENS,
+                    thinking_config=_THINKING_CONFIG,
+                ),
+            )
+        except genai_errors.APIError as exc:
+            if _is_quota_error(exc):
+                raise
+            raise GenerationError(f"Gemini request failed: {exc}") from exc
+        except Exception as exc:
+            raise GenerationError(f"Gemini request failed: {exc}") from exc
 
     try:
-        response = client.models.generate_content(
-            model=settings.LLM_MODEL_NAME,
-            contents=user_content,
-            config=types.GenerateContentConfig(
-                system_instruction=_build_system_instruction(jurisdiction),
-                temperature=0,
-                max_output_tokens=_MAX_OUTPUT_TOKENS,
-                thinking_config=_THINKING_CONFIG,
-            ),
-        )
+        response = call_with_rotation(_is_quota_error, _call)
     except genai_errors.APIError as exc:
-        if exc.code == 429 or exc.status == "RESOURCE_EXHAUSTED":
-            raise QuotaExceededError(
-                "Gemini's usage limit has been reached for now."
-                + _quota_wait_hint(exc)
-            ) from exc
-        raise GenerationError(f"Gemini request failed: {exc}") from exc
-    except Exception as exc:
-        raise GenerationError(f"Gemini request failed: {exc}") from exc
+        raise QuotaExceededError(
+            "Gemini's usage limit has been reached for now." + quota_wait_hint(exc)
+        ) from exc
 
     if response.prompt_feedback and response.prompt_feedback.block_reason:
         raise GenerationError(

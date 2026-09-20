@@ -52,6 +52,13 @@ beforeEach(() => {
   supabase.auth.onAuthStateChange.mockReturnValue({
     data: { subscription: { unsubscribe: vi.fn() } },
   })
+  // App wraps everything in a real BrowserRouter, which reads jsdom's actual
+  // window.history -- that persists across tests in this file (jsdom's
+  // window isn't recreated per-test), so a test that navigate()s with state
+  // (e.g. "starting a chat from the home page") leaves the next render(<App
+  // />) starting on that same leftover URL/state instead of "/". Reset it
+  // before every test so each one starts from a clean address bar.
+  window.history.pushState({}, '', '/')
 })
 
 describe('App', () => {
@@ -109,9 +116,33 @@ describe('App', () => {
     fireEvent.submit(field.closest('form'))
 
     expect(await screen.findByText('Riser height is 190mm max.')).toBeInTheDocument()
-    expect(askQuestion).toHaveBeenCalledWith('What is the max riser height?', 'NSW')
+    expect(askQuestion).toHaveBeenCalledWith('What is the max riser height?', 'NSW', null)
     // The question that started the chat also shows up as the new sidebar entry.
     expect(screen.getByRole('link', { name: 'What is the max riser height?' })).toBeInTheDocument()
+  })
+
+  it('attaching a document on the home page carries its text into the first chat message', async () => {
+    mockSignedIn()
+    uploadDocument.mockResolvedValue({ text_extraction: 'All footings are 300mm deep.' })
+    askQuestion.mockResolvedValue({ answer: 'Looks compliant.', citations: [], abstained: false })
+
+    render(<App />)
+
+    const file = new File(['plan contents'], 'site-plan.pdf', { type: 'application/pdf' })
+    fireEvent.change(await screen.findByLabelText('Choose a document to attach'), {
+      target: { files: [file] },
+    })
+    expect(await screen.findByText('Attached')).toBeInTheDocument()
+
+    const field = screen.getByPlaceholderText(/ask about a clause/i)
+    fireEvent.change(field, { target: { value: 'Does my plan comply?' } })
+    fireEvent.submit(field.closest('form'))
+
+    expect(await screen.findByText('Looks compliant.')).toBeInTheDocument()
+    expect(askQuestion).toHaveBeenCalledWith('Does my plan comply?', 'NSW', {
+      name: 'site-plan.pdf',
+      text: 'All footings are 300mm deep.',
+    })
   })
 
   it('navigating to Upload documents shows the upload page', async () => {

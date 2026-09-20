@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useParams } from 'react-router-dom'
 import { askQuestion } from '../api/client.js'
+import { useAttachment } from '../hooks/useAttachment.js'
 import SourcePanel from '../components/SourcePanel.jsx'
 import './ChatPage.css'
 
@@ -24,6 +25,18 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
   const [loadingStage, setLoadingStage] = useState(0)
   const [messages, setMessages] = useState([])
   const [openCitation, setOpenCitation] = useState(null)
+  // { name, text, status: 'uploading' | 'ready' | 'error', detail }. Resent
+  // on every message in this chat (see sendMessage) rather than persisted
+  // server-side -- see the chat-attachment plan. May start out already
+  // populated if the user attached a file on the home page before this chat
+  // existed (see the auto-send effect below, which carries it over).
+  const {
+    attachment,
+    setAttachment,
+    inputRef: attachmentInputRef,
+    handleAttachmentChange,
+    removeAttachment,
+  } = useAttachment()
   const { chatId } = useParams()
   const location = useLocation()
   const startedChatId = useRef(null)
@@ -54,10 +67,17 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
     return () => clearInterval(interval)
   }, [isLoading])
 
-  async function sendMessage(trimmedQuestion) {
+  // `attachmentOverride`, when passed, is used instead of the `attachment`
+  // state -- needed because the very first message of a chat started from
+  // the home page fires from an effect that also just called setAttachment
+  // for it (see the auto-send effect below), and that update isn't visible
+  // in this closure yet. Every other call site (typing + Enter/submit) omits
+  // it and just uses whatever's currently attached.
+  async function sendMessage(trimmedQuestion, attachmentOverride) {
     if (!trimmedQuestion) {
       return
     }
+    const activeAttachment = attachmentOverride !== undefined ? attachmentOverride : attachment
 
     const newMessage = {
       id: Date.now(),
@@ -79,6 +99,7 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
       const response = await askQuestion(
 	trimmedQuestion,
 	jurisdiction,
+	activeAttachment?.status === 'ready' ? { name: activeAttachment.name, text: activeAttachment.text } : null,
       )
 
       const assistantMessage = {
@@ -116,13 +137,20 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
 
   // A chat started from the home page arrives here with the question that
   // kicked it off — send it automatically instead of waiting for the user
-  // to retype it. Guarded by chatId so it only fires once per new chat.
+  // to retype it. Guarded by chatId so it only fires once per new chat. A
+  // document attached on the home page (see HomePage.jsx) rides along the
+  // same way, as { name, text } rather than the full attachment record.
   useEffect(() => {
     const initialQuestion = location.state?.initialQuestion
+    const initialAttachment = location.state?.attachment
 
     if (initialQuestion && startedChatId.current !== chatId) {
       startedChatId.current = chatId
-      sendMessage(initialQuestion)
+      const carriedAttachment = initialAttachment
+        ? { ...initialAttachment, status: 'ready', detail: 'Attached' }
+        : null
+      if (carriedAttachment) setAttachment(carriedAttachment)
+      sendMessage(initialQuestion, carriedAttachment)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, location.state])
@@ -216,6 +244,24 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
       </div>
 
       <div className="composer">
+        {attachment && (
+          <div className={`attachment-chip ${attachment.status === 'error' ? 'attachment-error' : ''}`}>
+            {attachment.status === 'uploading' && <span className="spin" />}
+            <span className="attachment-name">{attachment.name}</span>
+            <span className="attachment-detail">{attachment.detail}</span>
+            <button
+              type="button"
+              className="attachment-remove"
+              aria-label={`Remove ${attachment.name}`}
+              onClick={removeAttachment}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         <form className={`composer-in ${isLoading ? 'busy' : ''}`} onSubmit={handleSubmit}>
           <textarea
             ref={fieldRef}
@@ -228,6 +274,31 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
             disabled={isLoading}
           />
           <div className="tools">
+            <button
+              type="button"
+              className="attach"
+              aria-label="Attach a PDF or DOCX document"
+              onClick={() => attachmentInputRef.current?.click()}
+              disabled={isLoading || attachment?.status === 'uploading'}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M8 12.5V7a4 4 0 1 1 8 0v9.5a2.5 2.5 0 0 1-5 0V8.5"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <input
+              ref={attachmentInputRef}
+              type="file"
+              aria-label="Choose a document to attach"
+              accept=".pdf,.docx"
+              hidden
+              onChange={handleAttachmentChange}
+            />
             <button type="submit" className="send" aria-label="Send" disabled={isLoading || !question.trim()}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                 <path

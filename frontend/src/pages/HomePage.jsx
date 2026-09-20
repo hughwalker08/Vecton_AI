@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AUSTRALIAN_JURISDICTIONS } from '../lib/jurisdictions.js'
+import { useAttachment } from '../hooks/useAttachment.js'
 import './HomePage.css'
 
 const SUGGESTIONS = [
@@ -22,13 +23,22 @@ export default function HomePage({ onStartChat, defaultJurisdiction }) {
   const [jurisdiction, setJurisdiction] = useState(defaultJurisdiction || '')
   const navigate = useNavigate()
   const fieldRef = useRef(null)
+  const { attachment, inputRef: attachmentInputRef, handleAttachmentChange, removeAttachment } =
+    useAttachment()
 
   function startChat(text) {
     const trimmed = text.trim()
     if (!trimmed || !jurisdiction) return
 
     const chatId = onStartChat(trimmed, jurisdiction)
-    navigate(`/chat/${chatId}`, { state: { initialQuestion: trimmed, jurisdiction } })
+    // ChatPage picks this up on its very first render and carries it into
+    // its own attachment state -- see its auto-send effect. Only the text
+    // and name need to travel; status/detail are UI-local to this page.
+    const carriedAttachment =
+      attachment?.status === 'ready' ? { name: attachment.name, text: attachment.text } : undefined
+    navigate(`/chat/${chatId}`, {
+      state: { initialQuestion: trimmed, jurisdiction, attachment: carriedAttachment },
+    })
   }
 
   function handleSubmit(event) {
@@ -64,6 +74,24 @@ export default function HomePage({ onStartChat, defaultJurisdiction }) {
           Ask about a clause, a consent condition, or anything in your project documents.
         </p>
 
+        {attachment && (
+          <div className={`attachment-chip ${attachment.status === 'error' ? 'attachment-error' : ''}`}>
+            {attachment.status === 'uploading' && <span className="spin" />}
+            <span className="attachment-name">{attachment.name}</span>
+            <span className="attachment-detail">{attachment.detail}</span>
+            <button
+              type="button"
+              className="attachment-remove"
+              aria-label={`Remove ${attachment.name}`}
+              onClick={removeAttachment}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        )}
+
         <form className="composer-in big" onSubmit={handleSubmit}>
           <textarea
             ref={fieldRef}
@@ -75,6 +103,31 @@ export default function HomePage({ onStartChat, defaultJurisdiction }) {
             onKeyDown={handleKeyDown}
           />
           <div className="tools">
+            <button
+              type="button"
+              className="attach"
+              aria-label="Attach a PDF or DOCX document"
+              onClick={() => attachmentInputRef.current?.click()}
+              disabled={attachment?.status === 'uploading'}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M8 12.5V7a4 4 0 1 1 8 0v9.5a2.5 2.5 0 0 1-5 0V8.5"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <input
+              ref={attachmentInputRef}
+              type="file"
+              aria-label="Choose a document to attach"
+              accept=".pdf,.docx"
+              hidden
+              onChange={handleAttachmentChange}
+            />
             <label className="tool jurisdiction-picker">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                 <path

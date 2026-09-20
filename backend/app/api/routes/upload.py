@@ -3,8 +3,7 @@ Document upload endpoint.
 
 Intended flow (see planning doc, Part B - User document uploads):
     1. Accept a PDF or DOCX file.
-    2a. Parse to text - DOCX via python-docx, PDF via LlamaParse
-        (settings.PDF_PARSER, settings.LLAMAPARSE_API_KEY).   NOT IMPLEMENTED
+    2a. Parse to text - DOCX via python-docx, PDF via PyMuPDF.  IMPLEMENTED
     2b. Extract embedded images, match each to its caption in the
         document, and transcribe it.                          IMPLEMENTED
     3. Chunk and embed (Gemini text-embedding-004) the same way as the
@@ -18,10 +17,11 @@ dimensions and annotations come back as text, anchored to the caption the
 document gave them ("Figure 12: Subfloor ventilation detail"). The caption is
 what lets a description be tied back to the requirement it is evidence for.
 
-Text extraction (2a) is still the original skeleton -- see the parsing plan
-in the wiki. When it lands, image descriptions get spliced into the extracted
-text at their anchor points and the whole thing feeds
-services/compliance_analysis.analyse_document().
+Step 2a is a lightweight extraction (services/document_text.py) built for the
+chat-attachment feature: the text is returned to the caller as-is rather than
+spliced with image descriptions or fed into compliance_analysis.py. The
+heavier LlamaParse-based pipeline described in settings.PDF_PARSER is still
+not wired up, and remains the plan for step 3/4's chunk-and-embed path.
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ from app.services.document_images import (
     DocumentImageError,
     describe_document_images,
 )
+from app.services.document_text import extract_text
 from app.services.image_description import ImageDescriptionError
 
 router = APIRouter()
@@ -60,6 +61,8 @@ class ImageFindingResponse(BaseModel):
 class UploadResponse(BaseModel):
     filename: str
     status: str
+    # The document's own extracted text (services/document_text.py) -- named
+    # for the step it reports on, not just a status string.
     text_extraction: str
     images_found: int = 0
     images_skipped: int = 0
@@ -86,10 +89,17 @@ async def upload_document(
     if not data:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
+    try:
+        extracted_text = extract_text(data, filename)
+    except Exception as exc:  # noqa: BLE001 - wrong/corrupt/unreadable file
+        raise HTTPException(
+            status_code=400, detail=f"Could not extract text from {filename}: {exc}"
+        ) from exc
+
     response = UploadResponse(
         filename=filename,
         status="received",
-        text_extraction="not implemented (LlamaParse for PDF / python-docx for DOCX)",
+        text_extraction=extracted_text,
     )
 
     if not describe_images:

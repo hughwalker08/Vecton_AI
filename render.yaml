@@ -30,6 +30,13 @@ services:
       # Gemini key for embeddings, generation, and image transcription.
       - key: GEMINI_API_KEY
         sync: false
+      # Optional: comma-separated pool of teammates' keys to rotate through
+      # when one hits its quota (see backend/app/services/gemini_keys.py and
+      # backend/.env.example). Overrides GEMINI_API_KEY when set. Paste real
+      # values only into this dashboard field (Render encrypts env vars at
+      # rest) -- never into this file or git.
+      - key: GEMINI_API_KEYS
+        sync: false
       # Hugging Face Inference token for the retrieval reranker
       # (BAAI/bge-reranker-base) -- required, retrieval.py raises without it.
       - key: HF_API_TOKEN

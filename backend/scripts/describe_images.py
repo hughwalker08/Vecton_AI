@@ -52,6 +52,8 @@ if str(BACKEND_DIR) not in sys.path:
 
 from app.core.config import settings  # noqa: E402
 from app.services.image_description import (  # noqa: E402
+    FALLBACK_PROMPT,
+    PROMPT,
     PROMPT_VERSION,
     SUPPORTED_EXTENSIONS,
     ImageDescriptionError,
@@ -221,6 +223,24 @@ def write_index(out_path: Path, records: dict[str, dict]) -> Path:
 # Transcription with retries
 # --------------------------------------------------------------------------
 
+class QuotaExhausted(RuntimeError):
+    """The provider's per-day quota is gone. Retrying cannot help today."""
+
+
+def _is_daily_quota(exc: Exception) -> bool:
+    """True for a per-DAY quota exhaustion, as opposed to per-minute throttling.
+
+    The two arrive as the same HTTP 429, but they need opposite handling:
+    per-minute throttling clears in seconds and is worth backing off for,
+    while a spent daily allowance will reject every further request until the
+    quota resets. Retrying the latter four times per image just burns the
+    next day's budget too -- a free-tier run against a 20/day cap spent 56
+    requests on retries to describe nothing.
+    """
+    blob = f"{type(exc).__name__} {exc}"
+    return "PerDay" in blob or "per day" in blob.lower()
+
+
 def _is_rate_limit(exc: Exception) -> bool:
     blob = f"{type(exc).__name__} {exc}".lower()
     return any(
@@ -229,7 +249,8 @@ def _is_rate_limit(exc: Exception) -> bool:
     )
 
 
-def transcribe(path: Path, label: str, model, attempts: int) -> dict:
+def transcribe(path: Path, label: str, model, attempts: int, caption: str | None = None,
+               caption_in_image: bool = False, prompt: str = PROMPT) -> dict:
     """Describe one image, retrying transient failures. Returns a result dict."""
     started = time.monotonic()
     last_error = ""
@@ -238,7 +259,8 @@ def transcribe(path: Path, label: str, model, attempts: int) -> dict:
     for attempt in range(1, attempts + 1):
         made = attempt
         try:
-            result = describe_image(path, model=model)
+            result = describe_image(path, model=model, caption=caption,
+                                    caption_in_image=caption_in_image, prompt=prompt)
             return {
                 "ok": True,
                 "image": label,
@@ -246,6 +268,8 @@ def transcribe(path: Path, label: str, model, attempts: int) -> dict:
                 "description": result.text,
                 "model": result.model,
                 "prompt_version": result.prompt_version,
+                "prompt_variant": "fallback" if prompt is FALLBACK_PROMPT else "main",
+                "caption": caption,
                 "chars": len(result.text),
                 "attempts": attempt,
                 "seconds": round(time.monotonic() - started, 1),
@@ -257,6 +281,10 @@ def transcribe(path: Path, label: str, model, attempts: int) -> dict:
             break
         except Exception as exc:  # noqa: BLE001 - the SDK raises a wide variety
             last_error = f"{type(exc).__name__}: {exc}"
+            if _is_daily_quota(exc):
+                # Abort the whole run rather than burning the remaining
+                # allowance one image at a time.
+                raise QuotaExhausted(last_error) from exc
             if attempt == attempts:
                 break
             # Rate limits need a much longer wait than a flaky connection.
@@ -344,6 +372,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="process only the images that failed on the previous run")
     p.add_argument("--preview-lines", type=int, default=3,
                    help="lines of each fresh description to echo, 0 to disable (default: 3)")
+    p.add_argument("--captions", type=Path, default=None,
+                   help="JSON map of {image file name: caption}, e.g. the captions.json "
+                        "written by scripts/extract_pdf_figures.py. The caption is passed "
+                        "to the model as context and recorded on each output row.")
+    p.add_argument("--fallback-prompt", action="store_true",
+                   help="use the recitation-safe prompt variant: same headings and facts, "
+                        "framed as recording technical data rather than transcribing text. "
+                        "For figures the main prompt could not get past Gemini's copyright "
+                        "filter (finish_reason 4). Pair with --retry-failed.")
+    p.add_argument("--caption-in-image", action="store_true",
+                   help="the caption is printed inside the image (true for crops from "
+                        "scripts/extract_pdf_figures.py) -- tells the model to record it "
+                        "under ## Figure rather than treat it as external context")
     p.add_argument("--dry-run", action="store_true",
                    help="list what would be processed; make no API calls")
     return p.parse_args(argv)
@@ -371,6 +412,14 @@ def main(argv: list[str] | None = None) -> int:
         print(dim("Drop the NCC 2025 Vol 2 / ABCB Housing Provisions figures into "
                   f"{DEFAULT_INPUT} (sub-folders are fine), or pass a folder as an argument."))
         return 1
+
+    captions: dict[str, str] = {}
+    if args.captions:
+        if args.captions.exists():
+            captions = json.loads(args.captions.read_text(encoding="utf-8"))
+            print(f"  loaded {len(captions)} caption(s) from {args.captions}")
+        else:
+            print(yellow(f"  ! captions file not found: {args.captions}"))
 
     out_path = args.out.expanduser().resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -424,6 +473,7 @@ def main(argv: list[str] | None = None) -> int:
 
     total = len(queue)
     succeeded = failed = 0
+    quota_hit = False
     started = time.monotonic()
     pool: ThreadPoolExecutor | None = None
 
@@ -431,7 +481,10 @@ def main(argv: list[str] | None = None) -> int:
     err_fh = errors_path.open("a", encoding="utf-8")
 
     def run(item: tuple[Path, str]) -> dict:
-        return transcribe(item[0], item[1], model, max(1, args.attempts))
+        caption = captions.get(item[0].name) or captions.get(item[1])
+        return transcribe(item[0], item[1], model, max(1, args.attempts), caption,
+                          args.caption_in_image,
+                          FALLBACK_PROMPT if args.fallback_prompt else PROMPT)
 
     try:
         if args.workers > 1:
@@ -468,6 +521,14 @@ def main(argv: list[str] | None = None) -> int:
                 print(dim(f"  -- {i}/{total} done - {succeeded} ok, {failed} failed "
                           f"- {rate * 60:.1f}/min - ~{fmt_duration(remaining)} left "
                           f"- saving to {out_path.name}"))
+    except QuotaExhausted as exc:
+        print()
+        print(red("Provider daily quota exhausted -- stopping the run."))
+        print(dim(f"  {str(exc)[:200]}"))
+        print(yellow(f"  {succeeded} description(s) saved this run. Re-run the same "
+                     "command once the quota resets, or move the key to a paid tier; "
+                     "resume will skip everything already done."))
+        quota_hit = True
     except KeyboardInterrupt:
         print()
         print(yellow(f"Interrupted. {succeeded} description(s) already saved -- "
@@ -490,10 +551,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  failed      : {red(str(failed))} this run "
               f"- {outstanding} outstanding -> {errors_path}")
         print(dim("                re-run with --retry-failed to retry just these"))
+    if quota_hit:
+        print(f"  stopped     : {red('provider daily quota exhausted')}")
     print(f"  elapsed     : {fmt_duration(elapsed)}")
     print(f"  saved to    : {cyan(str(out_path))}   {dim('(one JSON record per line)')}")
     print(f"                {cyan(str(index_path))}   {dim('(flat image -> description map)')}")
     print()
+    if quota_hit:
+        return 3
     return 0 if failed == 0 else 1
 
 
