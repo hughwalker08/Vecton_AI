@@ -72,7 +72,14 @@ the explanation and classify it "needs_review" rather than guessing.
 "addressed" is worse than an extra item for the reviewer to check.
   - When in doubt between "missing" and "needs_review", choose "needs_review" if the document \
 mentions the general topic at all, even loosely; choose "missing" only if the topic doesn't \
-appear."""
+appear.
+  - Don't default to "needs_review" just to hedge. If the document states a specific fact -- a \
+number, a material, a yes/no -- that fails the requirement's actual threshold, that is \
+"contradicted", full stop, even if the document doesn't address every qualifier of the \
+requirement. Reserve "needs_review" for when the document's wording is genuinely ambiguous or \
+incomplete, not for cases where you can already say what's wrong with it -- if your own \
+explanation states the document's value doesn't meet the requirement, the status must be \
+"contradicted", not "needs_review"."""
 
 # Same retry/thinking-budget handling as app.services.generation -- each
 # Gemini-calling service module keeps its own copy rather than sharing one,
@@ -153,6 +160,27 @@ class _FindingLLM(BaseModel):
     status: Status
     explanation: str
     evidence: str | None = None
+
+
+def _dedupe_chunks(chunks: list[dict]) -> list[dict]:
+    """One chunk per distinct (clause_id, doc), in relevance order.
+
+    A long clause is split across multiple embedded chunks (see
+    app/ingest/chunker.py), so retrieve() can return the same clause_id more
+    than once -- api/routes/chat.py's _citations_from() already guards
+    against this for chat citations; analyse_document() needs the same
+    guard, or a clause with several chunks gets classified and reported as
+    two, three, or more identical findings instead of one.
+    """
+    seen: set[tuple[str, str | None]] = set()
+    deduped = []
+    for chunk in chunks:
+        clause_id, doc = chunk.get("clause_id"), chunk.get("doc")
+        if not clause_id or (clause_id, doc) in seen:
+            continue
+        seen.add((clause_id, doc))
+        deduped.append(chunk)
+    return deduped
 
 
 def _format_requirement(chunk: dict) -> str:
@@ -275,7 +303,7 @@ def analyse_document(
     if not query:
         raise ValueError("query must not be empty.")
 
-    chunks = retrieve(query, top_k=top_k, jurisdiction=jurisdiction)
+    chunks = _dedupe_chunks(retrieve(query, top_k=top_k, jurisdiction=jurisdiction))
     report = ComplianceReport(query=query, jurisdiction=jurisdiction)
     if not chunks:
         return report

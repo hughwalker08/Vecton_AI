@@ -31,6 +31,28 @@ def test_analyse_document_rejects_empty_query():
         ca.analyse_document("Some document text.", "   ")
 
 
+def test_analyse_document_dedupes_chunks_sharing_a_clause_id(monkeypatch):
+    # A long clause is split across multiple embedded chunks (see
+    # app/ingest/chunker.py), so retrieve() can legitimately return the same
+    # clause_id twice -- without deduping, that clause gets classified and
+    # reported as two identical findings instead of one.
+    monkeypatch.setattr(ca, "retrieve", lambda *a, **k: [_chunk(), _chunk()])
+    seen_chunks = []
+
+    def _classify(document_text, chunks):
+        seen_chunks.extend(chunks)
+        return {
+            "H1D4": ca._FindingLLM(clause_id="H1D4", status="addressed", explanation="x")
+        }
+
+    monkeypatch.setattr(ca, "_classify", _classify)
+
+    report = ca.analyse_document("Some document text.", "footing requirements")
+
+    assert len(seen_chunks) == 1  # the LLM is only asked about it once
+    assert len(report.findings) == 1  # and only one finding comes back
+
+
 def test_analyse_document_returns_empty_report_when_nothing_retrieved(monkeypatch):
     monkeypatch.setattr(ca, "retrieve", lambda *a, **k: [])
     called = []
