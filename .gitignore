@@ -39,3 +39,7 @@ backend/app/ingest/output/
 # merged *.embedded.json is the real, shared output and .meta.json (tiny) is
 # committed so everyone embeds with identical settings.
 backend/app/ingest/output/embeddings/*.jsonl
+
+# Source PDFs of the NCC 2025 / ABCB documents. Copyright ABCB, and large --
+# the repo holds the parsed output, never the source documents themselves.
+backend/data/source/
