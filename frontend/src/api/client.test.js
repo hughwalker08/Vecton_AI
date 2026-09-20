@@ -41,7 +41,7 @@ describe('askQuestion', () => {
       { role: 'assistant', text: 'Minimum 2.4m per H1D4.' },
     ]
 
-    await askQuestion('What about NSW?', 'NSW', history)
+    await askQuestion('What about NSW?', 'NSW', { history })
 
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).history).toEqual(history)
   })
@@ -51,7 +51,7 @@ describe('askQuestion', () => {
     vi.stubGlobal('fetch', fetchMock)
     const history = Array.from({ length: 10 }, (_, i) => ({ role: 'user', text: `turn ${i}` }))
 
-    await askQuestion('Q', 'NSW', history)
+    await askQuestion('Q', 'NSW', { history })
 
     const sentHistory = JSON.parse(fetchMock.mock.calls[0][1].body).history
     expect(sentHistory).toHaveLength(6)
@@ -88,6 +88,42 @@ describe('askQuestion', () => {
     )
 
     await expect(askQuestion('Q', 'NSW')).rejects.toThrow('Request failed (500)')
+  })
+
+  it('includes the attachment fields when an attachment is given', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      fakeResponse({ body: { answer: 'An answer.', citations: [], abstained: false } })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await askQuestion('Does my plan comply?', 'NSW', {
+      attachment: { name: 'site-plan.pdf', text: 'All footings are 300mm.' },
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/chat/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: 'Does my plan comply?',
+        jurisdiction: 'NSW',
+        history: [],
+        attachment_name: 'site-plan.pdf',
+        attachment_text: 'All footings are 300mm.',
+      }),
+    })
+  })
+
+  it('omits attachment fields entirely when no attachment is given', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ body: { answer: 'ok', citations: [], abstained: false } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await askQuestion('Q', 'NSW')
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/chat/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: 'Q', jurisdiction: 'NSW', history: [] }),
+    })
   })
 })
 
@@ -130,5 +166,14 @@ describe('uploadDocument', () => {
     )
 
     await expect(uploadDocument(new File(['x'], 'a.pdf'))).rejects.toThrow('Upload failed (503)')
+  })
+
+  it('adds describe_images=false to the URL when image transcription is disabled', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ body: { status: 'received' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await uploadDocument(new File(['x'], 'a.pdf'), { describeImages: false })
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/upload/?describe_images=false')
   })
 })

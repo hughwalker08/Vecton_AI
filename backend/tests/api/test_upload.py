@@ -1,20 +1,29 @@
 """
 Tests for POST /api/upload/ and GET /api/upload/supported-types.
 
-app.services.document_images.describe_document_images is imported by name
-into app.api.routes.upload's own namespace, so it's monkeypatched there --
-no real image extraction or vision-model calls happen in this file.
-
-Text extraction (LlamaParse for PDF / python-docx for DOCX) is documented
-as not yet implemented (see the module docstring) -- the "not implemented"
-stub value it reports is itself locked in by a test below, so this becomes
-a real regression test the day that pipeline is actually wired up.
+app.services.document_images.describe_document_images and
+app.services.document_text.extract_text are both imported by name into
+app.api.routes.upload's own namespace, so they're monkeypatched there -- no
+real image extraction, text extraction, or vision-model calls happen in this
+file. See tests/services/test_document_text.py for real extraction coverage.
 """
+
+import pytest
 
 from app.api.routes import upload
 from app.services.document_images import DocumentImageReport, ImageFinding
 
 _PDF_BYTES = b"%PDF-1.4 ..."
+
+
+@pytest.fixture(autouse=True)
+def _stub_text_extraction(monkeypatch):
+    """Every test in this file cares about the image pipeline or the upload
+    plumbing, not real text extraction -- default it to a stub so the fake
+    `_PDF_BYTES` above (not a real PDF) doesn't fail extraction and mask
+    what each test is actually checking. Tests exercising extraction itself
+    override this with their own monkeypatch.setattr call."""
+    monkeypatch.setattr(upload, "extract_text", lambda *a, **k: "extracted text")
 
 
 def _upload(client, filename="plan.pdf", data=_PDF_BYTES, **params):
@@ -43,17 +52,26 @@ def test_upload_rejects_an_empty_file(client):
     assert response.status_code == 400
 
 
-def test_upload_reports_text_extraction_is_not_yet_implemented(client, monkeypatch):
-    """Locks in the documented stub -- becomes a real assertion on the actual
-    extracted text once PDF/DOCX text parsing is wired up (see module docstring)."""
+def test_upload_reports_extracted_text(client, monkeypatch):
     monkeypatch.setattr(upload, "describe_document_images", lambda *a, **k: _report())
+    monkeypatch.setattr(upload, "extract_text", lambda data, filename: "Extracted body text.")
 
     response = _upload(client)
 
     assert response.status_code == 200
-    assert response.json()["text_extraction"] == (
-        "not implemented (LlamaParse for PDF / python-docx for DOCX)"
-    )
+    assert response.json()["text_extraction"] == "Extracted body text."
+
+
+def test_upload_text_extraction_failure_maps_to_400(client, monkeypatch):
+    def _raise(*a, **k):
+        raise ValueError("could not read PDF: not a PDF")
+
+    monkeypatch.setattr(upload, "extract_text", _raise)
+
+    response = _upload(client)
+
+    assert response.status_code == 400
+    assert "could not read PDF" in response.json()["detail"]
 
 
 def test_upload_skips_image_transcription_when_disabled(client, monkeypatch):

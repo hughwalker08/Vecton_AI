@@ -59,6 +59,31 @@ def test_ask_question_success_returns_answer_and_citations(client, monkeypatch):
     ]
 
 
+def test_ask_question_forwards_attachment_to_generate_answer(client, monkeypatch):
+    monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [_chunk()])
+    received = {}
+
+    def _generate_answer(question, chunks, **kwargs):
+        received.update(kwargs)
+        return "An answer using the attachment."
+
+    monkeypatch.setattr(chat, "generate_answer", _generate_answer)
+
+    response = client.post(
+        "/api/chat/",
+        json={
+            "question": "Does my plan comply?",
+            "jurisdiction": "NSW",
+            "attachment_name": "site-plan.pdf",
+            "attachment_text": "All footings are 300mm deep.",
+        },
+    )
+
+    assert response.status_code == 200
+    assert received["attachment_name"] == "site-plan.pdf"
+    assert received["attachment_text"] == "All footings are 300mm deep."
+
+
 def test_ask_question_deduplicates_citations_from_repeated_chunks(client, monkeypatch):
     monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [_chunk(), _chunk()])
     monkeypatch.setattr(chat, "generate_answer", lambda *a, **k: "An answer.")

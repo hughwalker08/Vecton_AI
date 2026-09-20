@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     # Decided: Gemini.
     LLM_PROVIDER: str = "gemini"
     GEMINI_API_KEY: str = ""
+    # Optional: several teammates' keys, comma-separated, so the app rotates
+    # to the next one when a key hits its rate limit or daily quota instead
+    # of failing (see app/services/gemini_keys.py). Overrides GEMINI_API_KEY
+    # when set. Real values belong in backend/.env (gitignored) or a Render
+    # dashboard env var (render.yaml) -- never in git.
+    GEMINI_API_KEYS: str = ""
     # gemini-2.5-flash was retired for new API keys (404 from Google as of
     # 2026-09); gemini-3.6-flash is Google's recommended direct replacement.
     LLM_MODEL_NAME: str = "gemini-3.6-flash"
@@ -53,6 +59,23 @@ class Settings(BaseSettings):
     LLAMAPARSE_API_KEY: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @property
+    def gemini_api_keys(self) -> list[str]:
+        """All configured Gemini keys, in rotation order (de-duplicated).
+
+        GEMINI_API_KEYS (comma-separated) wins over the single GEMINI_API_KEY
+        when both are set.
+        """
+        raw = self.GEMINI_API_KEYS or self.GEMINI_API_KEY
+        seen: set[str] = set()
+        keys: list[str] = []
+        for candidate in raw.split(","):
+            candidate = candidate.strip()
+            if candidate and candidate not in seen:
+                seen.add(candidate)
+                keys.append(candidate)
+        return keys
 
 
 settings = Settings()

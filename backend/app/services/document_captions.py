@@ -34,8 +34,13 @@ CAPTION_PATTERN = re.compile(
     r"""^\s*
     (?P<kind>figure|fig\.?|table|diagram|drawing|detail|photo|image|plate|sketch|appendix)
     \s*
-    # "12", "3.2", "7a", and drawing-register forms like "A-101" or "SK.02".
-    (?P<number>[A-Za-z]{0,2}[.\-]?\d+(?:[.\-]\d+)*[a-z]?)?
+    # "12", "3.2", "10.2.15a", drawing-register forms like "A-101" / "SK.02",
+    # and the NCC's clause-style ids: "H1D4a", "A6G3a". The lookahead keeps
+    # this from swallowing an ordinary word -- a figure number has a digit in
+    # it somewhere.
+    (?P<number>(?=[A-Za-z0-9.\-]*\d)[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*)?
+    # NCC figures are routinely qualified: "Figure H1D4a (explanatory): ...".
+    (?:\s*\((?P<qualifier>[^)]{0,40})\))?
     \s*
     (?P<sep>[:.–—-]\s*)?
     (?P<title>.*)$

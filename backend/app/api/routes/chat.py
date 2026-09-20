@@ -17,6 +17,11 @@ request (the frontend keeps the chat's message list client-side -- there's
 no server-side conversation storage). Retrieval only ever searches on the
 current question; history is used for generation only, see
 generation.py's module docstring for why.
+
+A user can also attach one document to a chat (`attachment_name` /
+`attachment_text`, extracted client-side by services/document_text.py via
+/api/upload/) -- also resent every turn, also generation-only, not used for
+retrieval.
 """
 
 from __future__ import annotations
@@ -74,6 +79,11 @@ class ChatRequest(BaseModel):
     # generation.MAX_HISTORY_MESSAGES) -- the frontend also trims what it
     # sends, but generate_answer() enforces the cap regardless of caller.
     history: list[ChatTurn] = []
+    # A document the user attached to this chat (services/document_text.py
+    # extracted it client-side, via /api/upload/, before this request). Resent
+    # by the frontend on every turn of the chat -- nothing is persisted here.
+    attachment_name: str | None = None
+    attachment_text: str | None = None
 
 
 class Citation(BaseModel):
@@ -142,7 +152,14 @@ def ask_question(request: ChatRequest) -> ChatResponse:
     history = [{"role": turn.role, "text": turn.text} for turn in request.history]
 
     try:
-        answer = generate_answer(question, chunks, jurisdiction=request.jurisdiction, history=history)
+        answer = generate_answer(
+            question,
+            chunks,
+            jurisdiction=request.jurisdiction,
+            history=history,
+            attachment_name=request.attachment_name,
+            attachment_text=request.attachment_text,
+        )
     except GenerationQuotaExceeded as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
     except GenerationError as exc:
