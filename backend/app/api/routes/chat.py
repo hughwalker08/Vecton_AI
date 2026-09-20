@@ -55,6 +55,11 @@ Jurisdiction = Literal[
 class ChatRequest(BaseModel):
     question: str
     jurisdiction: Jurisdiction
+    # A document the user attached to this chat (services/document_text.py
+    # extracted it client-side, via /api/upload/, before this request). Resent
+    # by the frontend on every turn of the chat -- nothing is persisted here.
+    attachment_name: str | None = None
+    attachment_text: str | None = None
 
 
 class Citation(BaseModel):
@@ -121,7 +126,13 @@ def ask_question(request: ChatRequest) -> ChatResponse:
         return ChatResponse(answer="No source found.", citations=[], abstained=True)
 
     try:
-        answer = generate_answer(question, chunks, jurisdiction=request.jurisdiction)
+        answer = generate_answer(
+            question,
+            chunks,
+            jurisdiction=request.jurisdiction,
+            attachment_name=request.attachment_name,
+            attachment_text=request.attachment_text,
+        )
     except GenerationQuotaExceeded as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
     except GenerationError as exc:

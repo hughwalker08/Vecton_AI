@@ -8,14 +8,21 @@
 // e.g. "https://vecton-backend.onrender.com/api".
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
-export async function askQuestion(question, jurisdiction) {
+// `attachment`, when given, is { name, text } for a document attached to the
+// chat (extracted client-side via uploadDocument() below, see ChatPage.jsx).
+// Only added to the request body when present, so the shape of an ordinary
+// question is unchanged.
+export async function askQuestion(question, jurisdiction, attachment) {
+  const body = { question, jurisdiction }
+  if (attachment?.text) {
+    body.attachment_name = attachment.name ?? null
+    body.attachment_text = attachment.text
+  }
+
   const res = await fetch(`${BASE_URL}/chat/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      question,
-      jurisdiction,
-    }),
+    body: JSON.stringify(body),
   })
 
   if (!res.ok) {
@@ -30,10 +37,14 @@ export async function askQuestion(question, jurisdiction) {
   return res.json()
 }
 
-export async function uploadDocument(file) {
+// `describeImages: false` skips the vision-model transcription pass (see
+// api/routes/upload.py) -- the chat-attach flow only needs the document's
+// text, so there's no reason to pay for image transcription on every attach.
+export async function uploadDocument(file, { describeImages = true } = {}) {
   const formData = new FormData()
   formData.append('file', file)
-  const res = await fetch(`${BASE_URL}/upload/`, {
+  const query = describeImages ? '' : '?describe_images=false'
+  const res = await fetch(`${BASE_URL}/upload/${query}`, {
     method: 'POST',
     body: formData,
   })
