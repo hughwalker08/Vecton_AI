@@ -84,11 +84,28 @@ it names {jurisdiction} — say plainly when a retrieved clause does not apply t
 jurisdiction rather than citing it as if it did, and note when a national requirement is \
 varied or replaced by a {jurisdiction}-specific one."""
 
+# The user can attach their own document to a chat (see api/routes/chat.py's
+# attachment_text) -- a design spec, drawing-set transcription, or building
+# report, extracted client-side via services/document_text.py. It's a second
+# source, not a corpus clause, so it needs an explicit carve-out from "every
+# statement needs a citation": otherwise the model either refuses to use it or
+# mislabels it as a code citation.
+_ATTACHMENT_ADDENDUM = """
 
-def _build_system_instruction(jurisdiction: str | None) -> str:
-    if not jurisdiction:
-        return SYSTEM_INSTRUCTION
-    return SYSTEM_INSTRUCTION + _JURISDICTION_ADDENDUM.format(jurisdiction=jurisdiction)
+The user has attached their own document to this chat, named "{name}" (given to you below as \
+ATTACHED DOCUMENT). You may use it as a second source: describe what it says and compare it \
+against the CONTEXT clauses. Attribute any statement drawn from it to the document by name \
+(e.g. "{name} states..."), never as a code citation — it is evidence about the user's project, \
+not a source for what the code requires. Only CONTEXT establishes what the NCC/ABCB requires."""
+
+
+def _build_system_instruction(jurisdiction: str | None, attachment_name: str | None = None) -> str:
+    instruction = SYSTEM_INSTRUCTION
+    if jurisdiction:
+        instruction += _JURISDICTION_ADDENDUM.format(jurisdiction=jurisdiction)
+    if attachment_name:
+        instruction += _ATTACHMENT_ADDENDUM.format(name=attachment_name)
+    return instruction
 
 # Gemini free/paid tiers both return transient 429/503s under load; retrying
 # a handful of times with backoff avoids surfacing those as user-facing
@@ -178,26 +195,46 @@ def _format_chunk(chunk: dict) -> str:
     return "\n".join(lines)
 
 
-def _build_user_content(question: str, chunks: list[dict]) -> str:
-    if not chunks:
-        return f"CONTEXT: (none retrieved)\n\nQUESTION: {question}"
-    context_block = "\n\n".join(_format_chunk(c) for c in chunks)
-    return f"CONTEXT:\n{context_block}\n\nQUESTION: {question}"
+def _build_user_content(
+    question: str,
+    chunks: list[dict],
+    attachment_name: str | None = None,
+    attachment_text: str | None = None,
+) -> str:
+    context_block = "\n\n".join(_format_chunk(c) for c in chunks) if chunks else "(none retrieved)"
+    parts = [f"CONTEXT:\n{context_block}"]
+    if attachment_text:
+        parts.append(f"ATTACHED DOCUMENT ({attachment_name}):\n{attachment_text}")
+    parts.append(f"QUESTION: {question}")
+    return "\n\n".join(parts)
 
 
-def generate_answer(question: str, chunks: list[dict], jurisdiction: str | None = None) -> str:
+def generate_answer(
+    question: str,
+    chunks: list[dict],
+    jurisdiction: str | None = None,
+    attachment_name: str | None = None,
+    attachment_text: str | None = None,
+) -> str:
     """Return an LLM-generated answer for the question, grounded in `chunks`.
 
     `jurisdiction` (e.g. "NSW"), when known, is folded into the system
     instruction so the model applies jurisdiction-qualified clauses correctly
     instead of just citing whatever the context happens to contain.
+
+    `attachment_text`, when given, is a document the user attached to the
+    chat (see api/routes/chat.py) -- a second source, folded into both the
+    user content and the system instruction so the model treats it as
+    project evidence rather than a corpus citation.
     """
     if not settings.gemini_api_keys:
         raise GenerationError(
             "GEMINI_API_KEY is not set. Copy backend/.env.example to backend/.env "
             "and fill it in (or export GEMINI_API_KEY / GEMINI_API_KEYS)."
         )
-    user_content = _build_user_content(question, chunks)
+    attachment_text = (attachment_text or "").strip() or None
+    attachment_label = (attachment_name or "the attached document") if attachment_text else None
+    user_content = _build_user_content(question, chunks, attachment_label, attachment_text)
 
     def _call(key: str):
         client = _client_for(key)
@@ -206,7 +243,7 @@ def generate_answer(question: str, chunks: list[dict], jurisdiction: str | None 
                 model=settings.LLM_MODEL_NAME,
                 contents=user_content,
                 config=types.GenerateContentConfig(
-                    system_instruction=_build_system_instruction(jurisdiction),
+                    system_instruction=_build_system_instruction(jurisdiction, attachment_label),
                     temperature=0,
                     max_output_tokens=_MAX_OUTPUT_TOKENS,
                     thinking_config=_THINKING_CONFIG,
