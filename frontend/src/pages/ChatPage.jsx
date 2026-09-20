@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { askQuestion } from '../api/client.js'
 import { useAttachment } from '../hooks/useAttachment.js'
+import { supabase } from '../lib/supabase.js'
+import { deriveChatTitle } from '../lib/chatTitle.js'
 import SourcePanel from '../components/SourcePanel.jsx'
 import './ChatPage.css'
 
@@ -19,7 +21,7 @@ const LOADING_STAGES = [
 ]
 const LOADING_STAGE_INTERVAL_MS = 2500
 
-export default function ChatPage({ chats = [], defaultJurisdiction }) {
+export default function ChatPage({ chats = [], defaultJurisdiction, userId }) {
   const [question, setQuestion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [loadingStage, setLoadingStage] = useState(0)
@@ -41,6 +43,10 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
   const location = useLocation()
   const navigate = useNavigate()
   const startedChatId = useRef(null)
+  // Guards ensureConversation() (see sendMessage) so a chat with several
+  // messages doesn't re-upsert its `conversations` row on every send --
+  // set once per chatId, the first time a message for it is actually sent.
+  const ensuredChatId = useRef(null)
   const fieldRef = useRef(null)
   const scrollRef = useRef(null)
 
@@ -67,6 +73,89 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
 
     return () => clearInterval(interval)
   }, [isLoading])
+
+  // Loads a revisited chat's messages from Supabase (see migration 0007) so
+  // reopening one from the sidebar, or refreshing mid-chat, doesn't come back
+  // empty. Skipped when `initialQuestion` is pending: that's a chat just
+  // created on the home page, which has nothing to load yet and is about to
+  // populate `messages` itself via the auto-send effect below -- fetching
+  // here first would (at best) race it, and at worst briefly flash empty.
+  useEffect(() => {
+    if (location.state?.initialQuestion || !chatId) {
+      return
+    }
+
+    let cancelled = false
+
+    async function loadMessages() {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('id, role, text, citations, is_error, abstained')
+        .eq('conversation_id', chatId)
+        .order('created_at', { ascending: true })
+
+      if (cancelled) return
+
+      if (error) {
+        console.error(error)
+        return
+      }
+
+      ensuredChatId.current = chatId
+      const loaded = (data ?? []).map((row) => ({
+        id: row.id,
+        role: row.role,
+        text: row.text,
+        citations: row.citations ?? [],
+        isError: row.is_error,
+        abstained: row.abstained,
+      }))
+      // Functional update, checked against the *current* messages rather
+      // than whatever this closure captured at mount: if the user already
+      // sent a message before this fetch resolved (a slow network, revisiting
+      // a chat and typing immediately), don't stomp on it with a load that
+      // was already stale the moment it landed.
+      setMessages((current) => (current.length === 0 ? loaded : current))
+    }
+
+    loadMessages()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId])
+
+  // Creates this chat's `conversations` row the first time it actually gets
+  // a message (not when it's merely opened -- see App.jsx's createChat for
+  // why the row doesn't exist yet at that point). `ignoreDuplicates` makes
+  // this a no-op, not an overwrite, on every later message in the same chat
+  // (also reached, harmlessly, on a chat loaded above: ensuredChatId is
+  // already set there, so this is only ever a real insert once per chat).
+  async function ensureConversation(firstQuestion) {
+    if (ensuredChatId.current === chatId) return
+    ensuredChatId.current = chatId
+
+    const { error } = await supabase.from('conversations').upsert(
+      { id: chatId, user_id: userId, title: deriveChatTitle(firstQuestion), jurisdiction },
+      { onConflict: 'id', ignoreDuplicates: true },
+    )
+
+    if (error) console.error(error)
+  }
+
+  // Best-effort: chat still works this session even if a write fails (e.g.
+  // offline), it just won't survive a refresh. Errors are logged, not
+  // surfaced -- matches how the rest of this app treats Supabase writes
+  // (see App.jsx's loadProfile/loadChats).
+  function saveMessage(row) {
+    supabase
+      .from('messages')
+      .insert({ conversation_id: chatId, user_id: userId, ...row })
+      .then(({ error }) => {
+        if (error) console.error(error)
+      })
+  }
 
   // `attachmentOverride`, when passed, is used instead of the `attachment`
   // state -- needed because the very first message of a chat started from
@@ -95,6 +184,15 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
     if (fieldRef.current) fieldRef.current.style.height = 'auto'
     setOpenCitation(null)
     setIsLoading(true)
+
+    // Must resolve before saveMessage below: messages.conversation_id is a
+    // foreign key into conversations, so the row has to exist first.
+    await ensureConversation(trimmedQuestion)
+    saveMessage({
+      role: 'user',
+      text: trimmedQuestion,
+      attachment_name: activeAttachment?.status === 'ready' ? activeAttachment.name : null,
+    })
 
     // Prior turns only -- newMessage (the question just asked) isn't in
     // `messages` yet (setMessages above hasn't committed within this closure),
@@ -135,6 +233,12 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
         ...currentMessages,
         assistantMessage,
       ])
+      saveMessage({
+        role: 'assistant',
+        text: assistantMessage.text,
+        citations: assistantMessage.citations.length ? assistantMessage.citations : null,
+        abstained: assistantMessage.abstained,
+      })
     } catch (error) {
       const errorMessage = {
         id: Date.now() + 1,
@@ -149,6 +253,7 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
         ...currentMessages,
         errorMessage,
       ])
+      saveMessage({ role: 'assistant', text: errorMessage.text, is_error: true })
 
       console.error(error)
     } finally {

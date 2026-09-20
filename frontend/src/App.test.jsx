@@ -30,20 +30,45 @@ function mockSignedOut() {
   supabase.auth.getSession.mockResolvedValue({ data: { session: null } })
 }
 
+// Routes by table name so this one mock covers the user_profiles lookup
+// (App.jsx's loadProfile) as well as the conversations/messages calls that
+// fire once inside the real ChatPage a "start a chat" test navigates into
+// (see ChatPage.jsx's ensureConversation/saveMessage/history-load) -- none
+// of these tests seed prior chat history, so conversations/messages reads
+// always resolve empty.
 function mockSignedIn({ jurisdiction = 'NSW', email = 'jordan@example.com' } = {}) {
   supabase.auth.getSession.mockResolvedValue({
     data: { session: { user: { id: 'user-1', email } } },
   })
-  supabase.from.mockReturnValue({
-    select: () => ({
-      eq: () => ({
-        maybeSingle: () =>
-          Promise.resolve({
-            data: jurisdiction ? { jurisdiction } : null,
-            error: null,
+  supabase.from.mockImplementation((table) => {
+    if (table === 'user_profiles') {
+      return {
+        select: () => ({
+          eq: () => ({
+            maybeSingle: () =>
+              Promise.resolve({
+                data: jurisdiction ? { jurisdiction } : null,
+                error: null,
+              }),
           }),
-      }),
-    }),
+        }),
+      }
+    }
+    if (table === 'conversations') {
+      return {
+        select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        upsert: () => Promise.resolve({ error: null }),
+      }
+    }
+    if (table === 'messages') {
+      return {
+        select: () => ({
+          eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        }),
+        insert: () => Promise.resolve({ error: null }),
+      }
+    }
+    throw new Error(`mockSignedIn: unhandled supabase table "${table}"`)
   })
 }
 

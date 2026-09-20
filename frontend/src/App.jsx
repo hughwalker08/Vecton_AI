@@ -7,6 +7,7 @@ import UploadPage from './pages/UploadPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import OnboardingPage from './pages/OnboardingPage.jsx'
 import { supabase } from './lib/supabase.js'
+import { deriveChatTitle } from './lib/chatTitle.js'
 import './theme.css'
 import './App.css'
 
@@ -20,12 +21,42 @@ export default function App() {
 
   function createChat(question, jurisdiction) {
     const id = crypto.randomUUID()
-    const title = question.length > 60 ? `${question.slice(0, 57)}…` : question
+    const title = deriveChatTitle(question)
 
+    // Optimistic only -- the actual `conversations` row is written by
+    // ChatPage once the first message is sent (see its ensureConversation),
+    // not here, so this id never gets orphaned by a row insert racing a
+    // reload of the chats list below.
     setChats((currentChats) => [{ id, title, jurisdiction }, ...currentChats])
 
     return id
   }
+
+  // Reloads the sidebar's chat list from Supabase (see migration 0007) so it
+  // survives a refresh/new tab, instead of only ever holding what this tab's
+  // createChat() has added since it loaded.
+  useEffect(() => {
+    async function loadChats() {
+      if (!session?.user?.id) {
+        setChats([])
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('id, title, jurisdiction')
+        .order('updated_at', { ascending: false })
+
+      if (error) {
+        console.error(error)
+        return
+      }
+
+      setChats(data ?? [])
+    }
+
+    loadChats()
+  }, [session])
 
   useEffect(() => {
     async function loadSession() {
@@ -114,7 +145,13 @@ export default function App() {
             />
             <Route
 		path="/chat/:chatId"
-		element={<ChatPage chats={chats} defaultJurisdiction={profile.jurisdiction} />}
+		element={
+		  <ChatPage
+		    chats={chats}
+		    defaultJurisdiction={profile.jurisdiction}
+		    userId={session.user.id}
+		  />
+		}
 	    />
             <Route
               path="/upload"

@@ -8,6 +8,33 @@ vi.mock('../api/client.js', () => ({
   uploadDocument: vi.fn(),
 }))
 
+// ChatPage persists messages to Supabase (ensureConversation/saveMessage) and
+// loads a revisited chat's history from it -- see migration 0007. None of
+// these tests exercise persistence itself (that's covered separately); this
+// just keeps them from making real network calls, always resolving as if
+// this chat has no prior history and every write succeeds.
+vi.mock('../lib/supabase.js', () => ({
+  supabase: {
+    from: vi.fn((table) => {
+      if (table === 'conversations') {
+        return {
+          select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+          upsert: () => Promise.resolve({ error: null }),
+        }
+      }
+      if (table === 'messages') {
+        return {
+          select: () => ({
+            eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+          }),
+          insert: () => Promise.resolve({ error: null }),
+        }
+      }
+      throw new Error(`unhandled supabase table "${table}"`)
+    }),
+  },
+}))
+
 import { askQuestion, uploadDocument } from '../api/client.js'
 
 function renderChatPage({ jurisdiction = 'NSW', route = '/chat/abc', state } = {}) {
@@ -19,7 +46,10 @@ function renderChatPage({ jurisdiction = 'NSW', route = '/chat/abc', state } = {
             back to route state, then this default). None of these tests
             pass a chats list or state.jurisdiction, so the default is what
             actually reaches askQuestion. */}
-        <Route path="/chat/:chatId" element={<ChatPage defaultJurisdiction={jurisdiction} />} />
+        <Route
+          path="/chat/:chatId"
+          element={<ChatPage defaultJurisdiction={jurisdiction} userId="user-1" />}
+        />
       </Routes>
     </MemoryRouter>
   )
