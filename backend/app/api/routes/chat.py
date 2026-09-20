@@ -11,6 +11,17 @@ Flow (see planning doc, Part C - Query time):
 
 Steps 1-3 are app.services.retrieval.retrieve(); step 5 is
 app.services.generation.generate_answer().
+
+Multi-turn: the caller sends prior conversation turns as `history` on each
+request (the frontend keeps the chat's message list client-side -- there's
+no server-side conversation storage). Retrieval only ever searches on the
+current question; history is used for generation only, see
+generation.py's module docstring for why.
+
+A user can also attach one document to a chat (`attachment_name` /
+`attachment_text`, extracted client-side by services/document_text.py via
+/api/upload/) -- also resent every turn, also generation-only, not used for
+retrieval.
 """
 
 from __future__ import annotations
@@ -52,9 +63,22 @@ Jurisdiction = Literal[
 ]
 
 
+class ChatTurn(BaseModel):
+    """One prior message in the conversation, as shown in the chat UI --
+    not the retrieval internals (no chunks/citations), just the plain text.
+    See generation.generate_answer()'s docstring for how this is replayed."""
+
+    role: Literal["user", "assistant"]
+    text: str
+
+
 class ChatRequest(BaseModel):
     question: str
     jurisdiction: Jurisdiction
+    # Oldest first. Only the most recent messages are actually used (see
+    # generation.MAX_HISTORY_MESSAGES) -- the frontend also trims what it
+    # sends, but generate_answer() enforces the cap regardless of caller.
+    history: list[ChatTurn] = []
     # A document the user attached to this chat (services/document_text.py
     # extracted it client-side, via /api/upload/, before this request). Resent
     # by the frontend on every turn of the chat -- nothing is persisted here.
@@ -125,11 +149,14 @@ def ask_question(request: ChatRequest) -> ChatResponse:
     if not chunks or chunks[0]["rerank_score"] < MIN_RERANK_SCORE:
         return ChatResponse(answer="No source found.", citations=[], abstained=True)
 
+    history = [{"role": turn.role, "text": turn.text} for turn in request.history]
+
     try:
         answer = generate_answer(
             question,
             chunks,
             jurisdiction=request.jurisdiction,
+            history=history,
             attachment_name=request.attachment_name,
             attachment_text=request.attachment_text,
         )

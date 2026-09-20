@@ -54,7 +54,11 @@ describe('ChatPage', () => {
 
     expect(await screen.findByText('What are the footing requirements?')).toBeInTheDocument()
     expect(await screen.findByText('Footings must comply with H1D4.')).toBeInTheDocument()
-    expect(askQuestion).toHaveBeenCalledWith('What are the footing requirements?', 'NSW', null)
+    // First message in this chat -- no prior turns and nothing attached yet.
+    expect(askQuestion).toHaveBeenCalledWith('What are the footing requirements?', 'NSW', {
+      history: [],
+      attachment: null,
+    })
 
     // Citations don't carry a source_url (nothing in the corpus populates
     // one yet -- see backend/app/models/clause_chunk.py), so they're
@@ -80,7 +84,53 @@ describe('ChatPage', () => {
 
     fireEvent.keyDown(field, { key: 'Enter', shiftKey: false })
 
-    await waitFor(() => expect(askQuestion).toHaveBeenCalledWith('Q1', 'NSW', null))
+    await waitFor(() =>
+      expect(askQuestion).toHaveBeenCalledWith('Q1', 'NSW', { history: [], attachment: null }),
+    )
+  })
+
+  it('sends prior turns as history on a follow-up question, but not the one just asked', async () => {
+    askQuestion
+      .mockResolvedValueOnce({ answer: 'Minimum 2.4m per H1D4.', citations: [], abstained: false })
+      .mockResolvedValueOnce({ answer: 'Also 2.4m in NSW.', citations: [], abstained: false })
+    renderChatPage()
+    const field = screen.getByLabelText('Construction compliance question')
+
+    fireEvent.change(field, { target: { value: 'What ceiling height do we need in bedrooms?' } })
+    fireEvent.submit(field.closest('form'))
+    expect(await screen.findByText('Minimum 2.4m per H1D4.')).toBeInTheDocument()
+
+    fireEvent.change(field, { target: { value: 'What about NSW?' } })
+    fireEvent.submit(field.closest('form'))
+    expect(await screen.findByText('Also 2.4m in NSW.')).toBeInTheDocument()
+
+    expect(askQuestion).toHaveBeenLastCalledWith('What about NSW?', 'NSW', {
+      history: [
+        { role: 'user', text: 'What ceiling height do we need in bedrooms?' },
+        { role: 'assistant', text: 'Minimum 2.4m per H1D4.' },
+      ],
+      attachment: null,
+    })
+  })
+
+  it('does not replay a failed request as if the assistant had said it', async () => {
+    askQuestion
+      .mockRejectedValueOnce(new Error('Quota exceeded.'))
+      .mockResolvedValueOnce({ answer: 'A real answer.', citations: [], abstained: false })
+    renderChatPage()
+    const field = screen.getByLabelText('Construction compliance question')
+
+    fireEvent.change(field, { target: { value: 'Q1' } })
+    fireEvent.submit(field.closest('form'))
+    expect(await screen.findByText('Quota exceeded.')).toBeInTheDocument()
+
+    fireEvent.change(field, { target: { value: 'Q2' } })
+    fireEvent.submit(field.closest('form'))
+    expect(await screen.findByText('A real answer.')).toBeInTheDocument()
+
+    // Q1's error bubble is a UI-only failure notice, not a real assistant
+    // turn -- it must not be replayed back to the model as history.
+    expect(askQuestion).toHaveBeenLastCalledWith('Q2', 'NSW', { history: [], attachment: null })
   })
 
   it('clears the input and shows a loading state while waiting for a reply', async () => {
@@ -158,8 +208,8 @@ describe('ChatPage', () => {
 
     await waitFor(() =>
       expect(askQuestion).toHaveBeenCalledWith('Does my plan comply?', 'NSW', {
-        name: 'site-plan.pdf',
-        text: 'All footings are 300mm deep.',
+        history: [],
+        attachment: { name: 'site-plan.pdf', text: 'All footings are 300mm deep.' },
       }),
     )
   })
@@ -192,7 +242,9 @@ describe('ChatPage', () => {
     fireEvent.change(screen.getByLabelText('Construction compliance question'), { target: { value: 'Q1' } })
     fireEvent.submit(screen.getByLabelText('Construction compliance question').closest('form'))
 
-    await waitFor(() => expect(askQuestion).toHaveBeenCalledWith('Q1', 'NSW', null))
+    await waitFor(() =>
+      expect(askQuestion).toHaveBeenCalledWith('Q1', 'NSW', { history: [], attachment: null }),
+    )
   })
 
   it('disables the send button while a question is empty or blank', () => {

@@ -12,6 +12,23 @@ inline clause citations. If the chunks don't support an answer, the caller
 `chunks` comes from app.services.retrieval.retrieve() in normal operation;
 an empty list falls back to answering from the question alone (no corpus
 grounding), which the system instruction is written to refuse to do.
+
+Multi-turn: `generate_answer()` optionally takes prior conversation turns
+(`history`) and replays them ahead of the current question, Gemini-chat
+style, so a follow-up like "what about NSW?" is understood in context. This
+only affects generation -- retrieval always searches on the raw current
+question alone (see api/routes/chat.py), since a bare follow-up like that
+retrieves poorly on its own; a query-condensation step is a known future
+improvement, not implemented here.
+
+A user can also attach one document to a chat (`attachment_name`/
+`attachment_text`) -- folded in as a second, explicitly-labelled source
+(never cited as if it were a code clause) via `_ATTACHMENT_ADDENDUM`.
+
+Every call is retried across the pooled Gemini API keys in
+`settings.gemini_api_keys` (see services/gemini_keys.py) before a quota
+error is surfaced to the caller -- see call_with_rotation()'s docstring for
+the rotation strategy.
 """
 
 from __future__ import annotations
@@ -209,10 +226,41 @@ def _build_user_content(
     return "\n\n".join(parts)
 
 
+# How many prior turns (user+assistant messages, not exchanges) get replayed
+# ahead of the current question -- the chat-memory equivalent of
+# RETRIEVAL_TOP_K/MIN_RERANK_SCORE in api/routes/chat.py: a first cut, not a
+# hard technical ceiling. Gemini's context window is far bigger than this;
+# the constraint is per-request latency/cost, which scales with how much of
+# the conversation gets re-sent on every turn. Enforced here (not just by the
+# caller) so generate_answer() is safe to call with an unbounded history.
+MAX_HISTORY_MESSAGES = 6
+
+# Gemini's multi-turn roles are "user" and "model" -- not the "assistant"
+# label the frontend/chat.py use (matching OpenAI-style chat conventions).
+_ROLE_TO_GEMINI = {"user": "user", "assistant": "model"}
+
+
+def _history_contents(history: list[dict] | None) -> list[types.Content]:
+    """Prior turns (oldest first) as Gemini Content objects, most recent
+    MAX_HISTORY_MESSAGES only. Each turn is replayed as the plain text the
+    user saw -- the CONTEXT block built by _build_user_content() is only
+    attached to the *current* turn below, not stored per-turn, since the
+    model already generated its earlier answers with that context in view."""
+    if not history:
+        return []
+    trimmed = history[-MAX_HISTORY_MESSAGES:]
+    return [
+        types.Content(role=_ROLE_TO_GEMINI.get(turn["role"], "user"), parts=[types.Part(text=turn["text"])])
+        for turn in trimmed
+        if turn.get("text")
+    ]
+
+
 def generate_answer(
     question: str,
     chunks: list[dict],
     jurisdiction: str | None = None,
+    history: list[dict] | None = None,
     attachment_name: str | None = None,
     attachment_text: str | None = None,
 ) -> str:
@@ -221,6 +269,12 @@ def generate_answer(
     `jurisdiction` (e.g. "NSW"), when known, is folded into the system
     instruction so the model applies jurisdiction-qualified clauses correctly
     instead of just citing whatever the context happens to contain.
+
+    `history` is prior conversation turns, oldest first, each
+    {"role": "user"|"assistant", "text": str} -- the plain question/answer
+    text as shown in the chat UI, not the retrieval internals. Only the most
+    recent MAX_HISTORY_MESSAGES are replayed; retrieval itself (see
+    api/routes/chat.py) does not use history, only the raw current question.
 
     `attachment_text`, when given, is a document the user attached to the
     chat (see api/routes/chat.py) -- a second source, folded into both the
@@ -235,13 +289,16 @@ def generate_answer(
     attachment_text = (attachment_text or "").strip() or None
     attachment_label = (attachment_name or "the attached document") if attachment_text else None
     user_content = _build_user_content(question, chunks, attachment_label, attachment_text)
+    contents = _history_contents(history) + [
+        types.Content(role="user", parts=[types.Part(text=user_content)])
+    ]
 
     def _call(key: str):
         client = _client_for(key)
         try:
             return client.models.generate_content(
                 model=settings.LLM_MODEL_NAME,
-                contents=user_content,
+                contents=contents,
                 config=types.GenerateContentConfig(
                     system_instruction=_build_system_instruction(jurisdiction, attachment_label),
                     temperature=0,

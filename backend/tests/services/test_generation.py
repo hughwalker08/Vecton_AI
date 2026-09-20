@@ -1,12 +1,57 @@
 """
-Tests for the pure prompt-assembly helpers in app.services.generation.
+Tests for the pure, Gemini-call-free parts of app.services.generation:
+multi-turn history handling, and prompt-assembly (how the attachment and
+jurisdiction addenda get folded into the content sent to the model).
 
 Gemini-calling behaviour (retries, key rotation) is covered separately in
-test_generation_key_rotation.py; this file only checks how the attachment
-and jurisdiction addenda get folded into the content sent to the model.
+test_generation_key_rotation.py.
 """
 
 from app.services import generation as gen
+from app.services.generation import MAX_HISTORY_MESSAGES, _history_contents
+
+
+def test_history_contents_maps_user_and_assistant_to_gemini_roles():
+    history = [
+        {"role": "user", "text": "What ceiling height do we need in bedrooms?"},
+        {"role": "assistant", "text": "Minimum 2.4m per H1D4."},
+    ]
+
+    contents = _history_contents(history)
+
+    assert [c.role for c in contents] == ["user", "model"]
+    assert [c.parts[0].text for c in contents] == [
+        "What ceiling height do we need in bedrooms?",
+        "Minimum 2.4m per H1D4.",
+    ]
+
+
+def test_history_contents_trims_to_the_most_recent_max_history_messages():
+    history = [{"role": "user", "text": f"turn {i}"} for i in range(MAX_HISTORY_MESSAGES + 10)]
+
+    contents = _history_contents(history)
+
+    assert len(contents) == MAX_HISTORY_MESSAGES
+    # The trailing (most recent) turns are kept, not the earliest ones.
+    assert contents[-1].parts[0].text == f"turn {MAX_HISTORY_MESSAGES + 9}"
+
+
+def test_history_contents_skips_turns_with_empty_or_missing_text():
+    history = [
+        {"role": "user", "text": "A real question."},
+        {"role": "assistant", "text": ""},
+        {"role": "user"},
+    ]
+
+    contents = _history_contents(history)
+
+    assert len(contents) == 1
+    assert contents[0].parts[0].text == "A real question."
+
+
+def test_history_contents_empty_or_none_returns_no_content():
+    assert _history_contents([]) == []
+    assert _history_contents(None) == []
 
 
 def _chunk(**overrides):

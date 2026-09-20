@@ -8,12 +8,24 @@
 // e.g. "https://vecton-backend.onrender.com/api".
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
-// `attachment`, when given, is { name, text } for a document attached to the
-// chat (extracted client-side via uploadDocument() below, see ChatPage.jsx).
-// Only added to the request body when present, so the shape of an ordinary
-// question is unchanged.
-export async function askQuestion(question, jurisdiction, attachment) {
-  const body = { question, jurisdiction }
+// Matches backend/app/services/generation.py's MAX_HISTORY_MESSAGES -- kept
+// in sync manually (no shared config between the two apps). Trimming here
+// too, not just server-side, keeps the request body itself small rather
+// than relying on the backend to discard the extra messages after they've
+// already been sent.
+const MAX_HISTORY_MESSAGES = 6
+
+// `history` is prior conversation turns (see ChatPage.jsx), trimmed to the
+// most recent MAX_HISTORY_MESSAGES before sending. `attachment`, when given,
+// is { name, text } for a document attached to the chat (extracted
+// client-side via uploadDocument() below) -- only added to the request body
+// when present, so the shape of an ordinary question is unchanged.
+export async function askQuestion(question, jurisdiction, { history = [], attachment = null } = {}) {
+  const body = {
+    question,
+    jurisdiction,
+    history: history.slice(-MAX_HISTORY_MESSAGES),
+  }
   if (attachment?.text) {
     body.attachment_name = attachment.name ?? null
     body.attachment_text = attachment.text
