@@ -15,15 +15,14 @@ if they came from the same model, task type and dimensionality.
 
 from __future__ import annotations
 
-import re
-
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 
 from app.core.config import settings
+from app.services.gemini_keys import call_with_rotation, quota_wait_hint
 
-_client: genai.Client | None = None
+_clients: dict[str, genai.Client] = {}
 
 
 class EmbeddingError(Exception):
@@ -34,45 +33,50 @@ class QuotaExceededError(EmbeddingError):
     """Raised when Gemini's rate limit or daily quota has been used up."""
 
 
-def _quota_wait_hint(exc: Exception) -> str:
-    """Pull a retry delay out of a 429's error body, if one is given."""
-    match = re.search(r"retryDelay['\"]?\s*:\s*['\"]?(\d+)", str(exc))
-    return f" Try again in about {match.group(1)}s." if match else ""
+def _is_quota_error(exc: Exception) -> bool:
+    return isinstance(exc, genai_errors.APIError) and (
+        exc.code == 429 or exc.status == "RESOURCE_EXHAUSTED"
+    )
 
 
-def _get_client() -> genai.Client:
-    global _client
-    if not settings.GEMINI_API_KEY:
-        raise EmbeddingError(
-            "GEMINI_API_KEY is not set. Copy backend/.env.example to backend/.env "
-            "and fill it in (or export GEMINI_API_KEY)."
-        )
-    if _client is None:
-        _client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    return _client
+def _client_for(key: str) -> genai.Client:
+    if key not in _clients:
+        _clients[key] = genai.Client(api_key=key)
+    return _clients[key]
 
 
 def embed_text(text: str, task_type: str = "RETRIEVAL_QUERY") -> list[float]:
     """Return an `EMBEDDING_DIM`-dim embedding vector for `text`."""
-    client = _get_client()
-    try:
-        response = client.models.embed_content(
-            model=settings.EMBEDDING_MODEL_NAME,
-            contents=text,
-            config=types.EmbedContentConfig(
-                task_type=task_type,
-                output_dimensionality=settings.EMBEDDING_DIM,
-            ),
+    if not settings.gemini_api_keys:
+        raise EmbeddingError(
+            "GEMINI_API_KEY is not set. Copy backend/.env.example to backend/.env "
+            "and fill it in (or export GEMINI_API_KEY / GEMINI_API_KEYS)."
         )
+
+    def _call(key: str):
+        client = _client_for(key)
+        try:
+            return client.models.embed_content(
+                model=settings.EMBEDDING_MODEL_NAME,
+                contents=text,
+                config=types.EmbedContentConfig(
+                    task_type=task_type,
+                    output_dimensionality=settings.EMBEDDING_DIM,
+                ),
+            )
+        except genai_errors.APIError as exc:
+            if _is_quota_error(exc):
+                raise
+            raise EmbeddingError(f"Gemini embedding request failed: {exc}") from exc
+        except Exception as exc:
+            raise EmbeddingError(f"Gemini embedding request failed: {exc}") from exc
+
+    try:
+        response = call_with_rotation(_is_quota_error, _call)
     except genai_errors.APIError as exc:
-        if exc.code == 429 or exc.status == "RESOURCE_EXHAUSTED":
-            raise QuotaExceededError(
-                "Gemini's usage limit has been reached for now."
-                + _quota_wait_hint(exc)
-            ) from exc
-        raise EmbeddingError(f"Gemini embedding request failed: {exc}") from exc
-    except Exception as exc:
-        raise EmbeddingError(f"Gemini embedding request failed: {exc}") from exc
+        raise QuotaExceededError(
+            "Gemini's usage limit has been reached for now." + quota_wait_hint(exc)
+        ) from exc
 
     if not response.embeddings:
         raise EmbeddingError("Gemini returned no embedding.")

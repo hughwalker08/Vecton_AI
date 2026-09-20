@@ -18,10 +18,16 @@ importable and side-effect-free so the ingestion pipeline can call it later.
 from __future__ import annotations
 
 import mimetypes
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
 from app.core.config import settings
+from app.services.gemini_keys import call_with_rotation, quota_wait_hint
+
+# Serialises genai.configure() + generate_content() into one atomic step --
+# see the comment in describe_image_bytes._call.
+_configure_lock = threading.Lock()
 
 # Bump when the prompt changes materially — it is recorded on every output row
 # so you can tell which descriptions need regenerating after a prompt edit.
@@ -164,7 +170,10 @@ class ImageDescriptionError(RuntimeError):
 
 
 def build_model(model_name: str | None = None):
-    """Configure and return a Gemini model handle.
+    """Return a Gemini model handle. Does not configure a key itself --
+    `describe_image_bytes` reconfigures the SDK's global client with whichever
+    key the rotator hands it right before each call, since `genai.configure`
+    is process-global rather than per-model.
 
     Imported lazily so `--dry-run` and `--help` work without the SDK installed
     or an API key set.
@@ -176,14 +185,21 @@ def build_model(model_name: str | None = None):
             "google-generativeai is not installed. Run: pip install -r requirements.txt"
         ) from exc
 
-    if not settings.GEMINI_API_KEY:
+    if not settings.gemini_api_keys:
         raise ImageDescriptionError(
             "GEMINI_API_KEY is not set. Copy backend/.env.example to backend/.env "
-            "and fill it in (or export GEMINI_API_KEY)."
+            "and fill it in (or export GEMINI_API_KEY / GEMINI_API_KEYS)."
         )
 
-    genai.configure(api_key=settings.GEMINI_API_KEY)
     return genai.GenerativeModel(model_name or settings.VISION_MODEL_NAME)
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    try:
+        from google.api_core.exceptions import ResourceExhausted, TooManyRequests
+    except ImportError:  # pragma: no cover - environment issue
+        return False
+    return isinstance(exc, (ResourceExhausted, TooManyRequests))
 
 
 def mime_type_for(name: str) -> str:
@@ -320,9 +336,33 @@ def describe_image_bytes(
     payload, mime = prepare_payload(data, name)
 
     handle = model if model is not None else build_model(model_name)
-    response = handle.generate_content(
-        [with_caption(prompt, caption, caption_in_image), {"mime_type": mime, "data": payload}]
-    )
+    contents = [with_caption(prompt, caption), {"mime_type": mime, "data": payload}]
+
+    def _call(key: str):
+        import google.generativeai as genai
+
+        # google-generativeai keeps its configured key as process-global
+        # state (unlike the newer google-genai SDK's per-Client key), so the
+        # configure + call has to be one atomic step -- otherwise a second
+        # thread rotating keys between them would make this call fire under
+        # the wrong key.
+        with _configure_lock:
+            genai.configure(api_key=key)
+            try:
+                return handle.generate_content(contents)
+            except Exception as exc:
+                if _is_quota_error(exc):
+                    raise
+                raise ImageDescriptionError(f"Gemini request failed: {exc}") from exc
+
+    try:
+        response = call_with_rotation(_is_quota_error, _call)
+    except Exception as exc:
+        if _is_quota_error(exc):
+            raise ImageDescriptionError(
+                "Gemini's usage limit has been reached for now." + quota_wait_hint(exc)
+            ) from exc
+        raise
 
     text = (getattr(response, "text", None) or "").strip()
     if not text:
