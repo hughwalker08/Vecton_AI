@@ -71,3 +71,10 @@ services:
       # at the top of this file).
       - key: VITE_API_BASE_URL
         value: https://vecton-backend.onrender.com/api
+    routes:
+      # BrowserRouter client-side routes (e.g. /chat/:id) aren't real files --
+      # without this, refreshing or opening one directly 404s instead of
+      # loading the SPA and letting React Router take over.
+      - type: rewrite
+        source: /*
+        destination: /index.html
