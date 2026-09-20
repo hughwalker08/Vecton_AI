@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { askQuestion } from '../api/client.js'
 import { useAttachment } from '../hooks/useAttachment.js'
 import SourcePanel from '../components/SourcePanel.jsx'
@@ -39,6 +39,7 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
   } = useAttachment()
   const { chatId } = useParams()
   const location = useLocation()
+  const navigate = useNavigate()
   const startedChatId = useRef(null)
   const fieldRef = useRef(null)
   const scrollRef = useRef(null)
@@ -160,6 +161,14 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
   // to retype it. Guarded by chatId so it only fires once per new chat. A
   // document attached on the home page (see HomePage.jsx) rides along the
   // same way, as { name, text } rather than the full attachment record.
+  //
+  // startedChatId alone isn't enough: it's a ref, so it resets to null on
+  // any fresh page load of this URL, not just a genuine new chat -- but the
+  // browser's own history state (what location.state reads from) survives a
+  // reload. Without clearing it below, refreshing a chat right after
+  // starting it (or the tab getting reloaded in the background, e.g. by the
+  // dev server's HMR socket reconnecting) replays the first question and
+  // regenerates the answer.
   useEffect(() => {
     const initialQuestion = location.state?.initialQuestion
     const initialAttachment = location.state?.attachment
@@ -171,6 +180,7 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
         : null
       if (carriedAttachment) setAttachment(carriedAttachment)
       sendMessage(initialQuestion, carriedAttachment)
+      navigate(location.pathname, { replace: true, state: {} })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, location.state])

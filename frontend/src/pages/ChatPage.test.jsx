@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ChatPage from './ChatPage.jsx'
 
@@ -187,6 +187,38 @@ describe('ChatPage', () => {
     expect(await screen.findByText('What ceiling height do we need?')).toBeInTheDocument()
     expect(await screen.findByText('Auto-sent answer.')).toBeInTheDocument()
     expect(askQuestion).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears the initial-question route state after auto-sending, so reloading the chat does not replay it', async () => {
+    askQuestion.mockResolvedValue({ answer: 'Auto-sent answer.', citations: [], abstained: false })
+
+    // A ref guard alone (startedChatId) only survives re-renders, not a
+    // fresh page load -- and a real reload restores location.state from the
+    // browser's own history, not React state. LocationSpy observes the same
+    // router location ChatPage does, so this test can check the history
+    // entry was actually cleared after auto-send, not just that the ref
+    // was set.
+    let latestLocation
+    function LocationSpy() {
+      latestLocation = useLocation()
+      return null
+    }
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          { pathname: '/chat/abc', state: { initialQuestion: 'What ceiling height do we need?' } },
+        ]}
+      >
+        <LocationSpy />
+        <Routes>
+          <Route path="/chat/:chatId" element={<ChatPage defaultJurisdiction="NSW" />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Auto-sent answer.')).toBeInTheDocument()
+    await waitFor(() => expect(latestLocation.state?.initialQuestion).toBeUndefined())
   })
 
   it('attaches a PDF, shows it as ready, and sends its text with the next question', async () => {
