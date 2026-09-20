@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import UploadPage from './UploadPage.jsx'
 
@@ -41,7 +41,7 @@ describe('UploadPage', () => {
     uploadDocument.mockReturnValue(new Promise(() => {})) // never resolves in this test
     const { setFiles } = renderUploadPage([])
 
-    fireEvent.drop(screen.getByRole('button'), {
+    fireEvent.drop(screen.getByRole('button', { name: 'Upload a document' }), {
       dataTransfer: { files: [pdfFile()] },
     })
 
@@ -67,7 +67,7 @@ describe('UploadPage', () => {
     uploadDocument.mockResolvedValue({ status: 'processed 1 image(s) from plan.pdf' })
     const { setFiles } = renderUploadPage([])
 
-    fireEvent.drop(screen.getByRole('button'), { dataTransfer: { files: [pdfFile()] } })
+    fireEvent.drop(screen.getByRole('button', { name: 'Upload a document' }), { dataTransfer: { files: [pdfFile()] } })
     const uploading = applyUpdater([], setFiles, 0)
 
     await vi.waitFor(() => expect(setFiles).toHaveBeenCalledTimes(2))
@@ -83,7 +83,7 @@ describe('UploadPage', () => {
     uploadDocument.mockRejectedValue(new Error('Uploaded file is empty.'))
     const { setFiles } = renderUploadPage([])
 
-    fireEvent.drop(screen.getByRole('button'), { dataTransfer: { files: [pdfFile()] } })
+    fireEvent.drop(screen.getByRole('button', { name: 'Upload a document' }), { dataTransfer: { files: [pdfFile()] } })
     const uploading = applyUpdater([], setFiles, 0)
 
     await vi.waitFor(() => expect(setFiles).toHaveBeenCalledTimes(2))
@@ -97,8 +97,12 @@ describe('UploadPage', () => {
       { id: 1, name: 'plan.pdf', size: 204800, uploadedAt: new Date(), status: 'done', detail: 'processed' },
     ])
 
-    expect(screen.getByText('plan.pdf')).toBeInTheDocument()
-    expect(screen.getByText('processed')).toBeInTheDocument()
+    // Scoped to the uploaded-files list: a "done" file's name also shows up
+    // as an option in the Compliance Check section's document picker below,
+    // so an unscoped query would match both.
+    const list = document.querySelector('.list')
+    expect(within(list).getByText('plan.pdf')).toBeInTheDocument()
+    expect(within(list).getByText('processed')).toBeInTheDocument()
     expect(screen.getByText('1')).toBeInTheDocument() // document count
   })
 

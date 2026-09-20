@@ -5,9 +5,10 @@ import ChatPage from './ChatPage.jsx'
 
 vi.mock('../api/client.js', () => ({
   askQuestion: vi.fn(),
+  uploadDocument: vi.fn(),
 }))
 
-import { askQuestion } from '../api/client.js'
+import { askQuestion, uploadDocument } from '../api/client.js'
 
 function renderChatPage({ jurisdiction = 'NSW', route = '/chat/abc', state } = {}) {
   return render(
@@ -26,6 +27,7 @@ function renderChatPage({ jurisdiction = 'NSW', route = '/chat/abc', state } = {
 
 beforeEach(() => {
   askQuestion.mockReset()
+  uploadDocument.mockReset()
 })
 
 describe('ChatPage', () => {
@@ -52,8 +54,11 @@ describe('ChatPage', () => {
 
     expect(await screen.findByText('What are the footing requirements?')).toBeInTheDocument()
     expect(await screen.findByText('Footings must comply with H1D4.')).toBeInTheDocument()
-    // First message in this chat -- no prior turns to send yet.
-    expect(askQuestion).toHaveBeenCalledWith('What are the footing requirements?', 'NSW', [])
+    // First message in this chat -- no prior turns and nothing attached yet.
+    expect(askQuestion).toHaveBeenCalledWith('What are the footing requirements?', 'NSW', {
+      history: [],
+      attachment: null,
+    })
 
     // Citations don't carry a source_url (nothing in the corpus populates
     // one yet -- see backend/app/models/clause_chunk.py), so they're
@@ -79,7 +84,9 @@ describe('ChatPage', () => {
 
     fireEvent.keyDown(field, { key: 'Enter', shiftKey: false })
 
-    await waitFor(() => expect(askQuestion).toHaveBeenCalledWith('Q1', 'NSW', []))
+    await waitFor(() =>
+      expect(askQuestion).toHaveBeenCalledWith('Q1', 'NSW', { history: [], attachment: null }),
+    )
   })
 
   it('sends prior turns as history on a follow-up question, but not the one just asked', async () => {
@@ -97,10 +104,13 @@ describe('ChatPage', () => {
     fireEvent.submit(field.closest('form'))
     expect(await screen.findByText('Also 2.4m in NSW.')).toBeInTheDocument()
 
-    expect(askQuestion).toHaveBeenLastCalledWith('What about NSW?', 'NSW', [
-      { role: 'user', text: 'What ceiling height do we need in bedrooms?' },
-      { role: 'assistant', text: 'Minimum 2.4m per H1D4.' },
-    ])
+    expect(askQuestion).toHaveBeenLastCalledWith('What about NSW?', 'NSW', {
+      history: [
+        { role: 'user', text: 'What ceiling height do we need in bedrooms?' },
+        { role: 'assistant', text: 'Minimum 2.4m per H1D4.' },
+      ],
+      attachment: null,
+    })
   })
 
   it('does not replay a failed request as if the assistant had said it', async () => {
@@ -120,7 +130,7 @@ describe('ChatPage', () => {
 
     // Q1's error bubble is a UI-only failure notice, not a real assistant
     // turn -- it must not be replayed back to the model as history.
-    expect(askQuestion).toHaveBeenLastCalledWith('Q2', 'NSW', [])
+    expect(askQuestion).toHaveBeenLastCalledWith('Q2', 'NSW', { history: [], attachment: null })
   })
 
   it('clears the input and shows a loading state while waiting for a reply', async () => {
@@ -177,6 +187,64 @@ describe('ChatPage', () => {
     expect(await screen.findByText('What ceiling height do we need?')).toBeInTheDocument()
     expect(await screen.findByText('Auto-sent answer.')).toBeInTheDocument()
     expect(askQuestion).toHaveBeenCalledTimes(1)
+  })
+
+  it('attaches a PDF, shows it as ready, and sends its text with the next question', async () => {
+    uploadDocument.mockResolvedValue({ text_extraction: 'All footings are 300mm deep.' })
+    askQuestion.mockResolvedValue({ answer: 'Looks compliant.', citations: [], abstained: false })
+    renderChatPage()
+
+    const file = new File(['plan contents'], 'site-plan.pdf', { type: 'application/pdf' })
+    const fileInput = screen.getByLabelText('Choose a document to attach')
+    fireEvent.change(fileInput, { target: { files: [file] } })
+
+    expect(await screen.findByText('site-plan.pdf')).toBeInTheDocument()
+    expect(await screen.findByText('Attached')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Construction compliance question'), {
+      target: { value: 'Does my plan comply?' },
+    })
+    fireEvent.submit(screen.getByLabelText('Construction compliance question').closest('form'))
+
+    await waitFor(() =>
+      expect(askQuestion).toHaveBeenCalledWith('Does my plan comply?', 'NSW', {
+        history: [],
+        attachment: { name: 'site-plan.pdf', text: 'All footings are 300mm deep.' },
+      }),
+    )
+  })
+
+  it('rejects a file that is not a PDF or DOCX without calling the upload API', async () => {
+    renderChatPage()
+
+    const file = new File(['hello'], 'notes.txt', { type: 'text/plain' })
+    const fileInput = screen.getByLabelText('Choose a document to attach')
+    fireEvent.change(fileInput, { target: { files: [file] } })
+
+    expect(await screen.findByText('Only PDF or DOCX files can be attached.')).toBeInTheDocument()
+    expect(uploadDocument).not.toHaveBeenCalled()
+  })
+
+  it('removes an attachment so later questions are sent without it', async () => {
+    uploadDocument.mockResolvedValue({ text_extraction: 'Attachment text.' })
+    askQuestion.mockResolvedValue({ answer: 'ok', citations: [], abstained: false })
+    renderChatPage()
+
+    const file = new File(['x'], 'plan.docx')
+    fireEvent.change(screen.getByLabelText('Choose a document to attach'), {
+      target: { files: [file] },
+    })
+    expect(await screen.findByText('plan.docx')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove plan.docx' }))
+    expect(screen.queryByText('plan.docx')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Construction compliance question'), { target: { value: 'Q1' } })
+    fireEvent.submit(screen.getByLabelText('Construction compliance question').closest('form'))
+
+    await waitFor(() =>
+      expect(askQuestion).toHaveBeenCalledWith('Q1', 'NSW', { history: [], attachment: null }),
+    )
   })
 
   it('disables the send button while a question is empty or blank', () => {
