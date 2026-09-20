@@ -79,6 +79,22 @@ describe('UploadPage', () => {
     })
   })
 
+  it('stores the extracted text alongside a completed upload', async () => {
+    uploadDocument.mockResolvedValue({
+      status: 'processed 1 image(s) from plan.pdf',
+      text_extraction: 'All footings are 300mm deep.',
+    })
+    const { setFiles } = renderUploadPage([])
+
+    fireEvent.drop(screen.getByRole('button', { name: 'Upload a document' }), { dataTransfer: { files: [pdfFile()] } })
+    const uploading = applyUpdater([], setFiles, 0)
+
+    await vi.waitFor(() => expect(setFiles).toHaveBeenCalledTimes(2))
+    const done = applyUpdater(uploading, setFiles, 1)
+
+    expect(done[0].text).toBe('All footings are 300mm deep.')
+  })
+
   it('marks a file as errored when the upload rejects', async () => {
     uploadDocument.mockRejectedValue(new Error('Uploaded file is empty.'))
     const { setFiles } = renderUploadPage([])
@@ -119,5 +135,42 @@ describe('UploadPage', () => {
       setFiles,
     )
     expect(next).toHaveLength(0)
+  })
+
+  it('selecting an uploaded document fills the compliance-check text box with its extracted text', () => {
+    renderUploadPage([
+      {
+        id: 1,
+        name: 'plan.pdf',
+        size: 1024,
+        uploadedAt: new Date(),
+        status: 'done',
+        detail: 'processed',
+        text: 'All footings are 300mm deep.',
+      },
+    ])
+
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+
+    expect(screen.getByLabelText('Document text')).toHaveValue('All footings are 300mm deep.')
+  })
+
+  it('does not clobber manually-typed text when the selected file extracted nothing', () => {
+    renderUploadPage([
+      {
+        id: 1,
+        name: 'scanned.pdf',
+        size: 1024,
+        uploadedAt: new Date(),
+        status: 'done',
+        detail: 'processed',
+        text: '', // e.g. a scanned PDF with no text layer
+      },
+    ])
+
+    fireEvent.change(screen.getByLabelText('Document text'), { target: { value: 'Manually typed text.' } })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+
+    expect(screen.getByLabelText('Document text')).toHaveValue('Manually typed text.')
   })
 })

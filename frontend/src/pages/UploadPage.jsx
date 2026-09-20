@@ -246,7 +246,17 @@ function ComplianceCheck({ jurisdiction, files }) {
           <select
             id="cc-file"
             value={fileValue}
-            onChange={(e) => setSelectedFileId(e.target.value)}
+            onChange={(e) => {
+              const id = e.target.value
+              setSelectedFileId(id)
+              const file = uploadedFiles.find((f) => String(f.id) === id)
+              // Only overwrite the textarea when the file actually extracted
+              // something -- a scanned PDF with no text layer, for instance,
+              // extracts to '' and should leave whatever's already typed alone.
+              if (file?.text) {
+                setDocumentText(file.text)
+              }
+            }}
             disabled={uploadedFiles.length === 0}
           >
             <option value="">
@@ -259,7 +269,8 @@ function ComplianceCheck({ jurisdiction, files }) {
             ))}
           </select>
           <span className="cc-hint">
-            compliance check relies on the pasted document text, this is currently only a label 
+            Selecting a document fills in its extracted text below -- you can still edit it before
+            running the check.
           </span>
         </div>
 
@@ -282,7 +293,7 @@ function ComplianceCheck({ jurisdiction, files }) {
             id="cc-text"
             value={documentText}
             onChange={(e) => setDocumentText(e.target.value)}
-            placeholder="Paste in the text content of your document (text extraction not yet available)"
+            placeholder="Select a document above, or paste in the text content of your document"
           />
         </div>
 
@@ -397,7 +408,9 @@ export default function UploadPage({ files, setFiles, jurisdiction }) {
 
       setFiles((current) =>
         current.map((f) =>
-          f.id === record.id ? { ...f, status: 'done', detail: response.status } : f,
+          f.id === record.id
+            ? { ...f, status: 'done', detail: response.status, text: response.text_extraction }
+            : f,
         ),
       )
     } catch (error) {
