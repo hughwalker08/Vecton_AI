@@ -213,3 +213,360 @@
     display: none;
   }
 }
+
+
+/* Upload page UI: display compliance findings | Compliance Check | 
+new classes' names are prefixed with cc (compliancecheck) to keep them
+from affecting anything from the rest of the page. */
+
+.cc {
+  margin-top: 44px;
+  padding-top: 32px;
+  border-top: 1px solid var(--rule-soft, #f0ede7);
+}
+
+.cc-head h2 {
+  font-family: var(--serif, serif);
+  font-weight: 500;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.1;
+}
+
+.cc-head .sub {
+  color: var(--muted, #8d8880);
+  font-size: 13.5px;
+  margin: 7px 0 0;
+}
+
+/* form */
+.cc-form {
+  border: 1px solid var(--rule, #e6e3dd);
+  border-radius: 14px;
+  padding: 20px;
+  margin: 22px 0;
+}
+
+.cc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cc-textwrap {
+  margin-bottom: 16px;
+}
+
+.cc-field label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cc-field label i {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--muted, #8d8880);
+}
+
+.cc-hint {
+  font-size: 12px;
+  color: var(--muted, #8d8880);
+}
+
+.cc-field input,
+.cc-field select,
+.cc-field textarea {
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  background: var(--paper, #fff);
+  border: 1px solid var(--rule, #e6e3dd);
+  border-radius: 15px;
+  padding: 9px 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.cc-field textarea {
+  min-height: 200px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.cc-field input:focus-visible,
+.cc-field select:focus-visible,
+.cc-field textarea:focus-visible {
+  outline: 2px solid var(--accent, #f05a22);
+  outline-offset: 1px;
+  border-color: var(--accent, #f05a22);
+}
+
+.cc-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cc-status {
+  font-size: 13px;
+  color: var(--muted, #8d8880);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/*button matches the send button from ChatPage.css*/
+.cc-send {
+  font: inherit;
+  background: var(--accent, #f05a22);
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.14s, filter 0.14s, opacity 0.14s;
+
+}
+
+.cc-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cc-send:focus-visible {
+  outline: 2px solid var(--accent, #f05a22);
+  outline-offset: 2px;
+}
+
+.cc-send:hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: scale(1.01);
+}
+
+.cc-error {
+  color: #b3261e;
+  font-size: 13.5px;
+  margin: 0 0 18px;
+}
+
+.cc-flagform-error {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+/* count strip (filters the list) */
+.cc-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 26px;
+  margin: 4px 0 22px;
+}
+
+.cc-count {
+  font: inherit;
+  color: var(--c);
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0 0 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+}
+
+.cc-count::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  align-self: center;
+  margin-right: 8px;
+}
+
+.cc-count[aria-pressed="true"] {
+  border-bottom-color: currentColor;
+}
+
+.cc-count b {
+  font-family: var(--serif, serif);
+  font-weight: 500;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+}
+
+.cc-count span {
+  font-size: 12.5px;
+  color: var(--muted, #8d8880);
+  margin-left: 6px;
+}
+
+.cc-count:focus-visible {
+  outline: 2px solid var(--accent, #f05a22);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* status colours; define --ok/--miss/--bad/--warn in your theme to override */
+.cc-addressed    { --c: var(--ok, #1f7a4d); }
+.cc-missing      { --c: var(--miss, #6b675f); }
+.cc-contradicted { --c: var(--bad, #b3261e); }
+.cc-needs_review { --c: var(--warn, #93600a); }
+
+/* finding rows (extend .item) */
+.cc-finding {
+  align-items: flex-start;
+  border-left: 3px solid var(--c);
+  border-radius: 0 10px 10px 0;
+}
+
+.cc-nm {
+  white-space: normal;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.cc-badge {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--c);
+  border: 1px solid var(--c);
+  border-radius: 99px;
+  padding: 1px 9px;
+}
+
+.cc-doc {
+  color: var(--muted, #8d8880);
+  font-weight: 400;
+  font-size: 12.5px;
+}
+
+.cc-explain {
+  font-size: 13.5px;
+  color: var(--ink-2, #4b4741);
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.cc-quote {
+  margin: 8px 0 0;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--rule, #e6e3dd);
+  font-family: var(--serif, serif);
+  font-size: 14.5px;
+  color: var(--muted, #8d8880);
+  line-height: 1.5;
+}
+
+.cc-link {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent, #f05a22);
+  background: none;
+  border: 0;
+  padding: 8px 0 0;
+  cursor: pointer;
+}
+
+.cc-sent {
+  font-size: 12.5px;
+  color: var(--ok, #1f7a4d);
+  margin: 8px 0 0;
+}
+
+/* flag button + inline feedback form */
+.cc-flag {
+  flex: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--muted, #8d8880);
+  background: none;
+  border: 0;
+  padding: 5px 7px;
+  border-radius: 7px;
+  cursor: pointer;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  transition: background 0.12s, color 0.12s;
+}
+
+.cc-flag:hover,
+.cc-flag[aria-expanded="true"] {
+  background: var(--rule-soft, #f0ede7);
+  color: var(--ink, #1b1a18);
+}
+
+.cc-flag:focus-visible {
+  outline: 2px solid var(--accent, #f05a22);
+  outline-offset: 2px;
+}
+
+.cc-flagform {
+  display: grid;
+  grid-template-columns: 180px 1fr auto;
+  gap: 10px;
+  align-items: end;
+  margin-top: 10px;
+  padding: 12px;
+  background: var(--hover, #f4f2ee);
+  border-radius: 10px;
+}
+
+/* results bar: "Findings for <file>" on the left, Clear button on the right */
+.cc-resultbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+.cc-forfile {
+  font-size: 13px;
+  color: var(--muted, #8d8880);
+  margin: 0;
+}
+
+.cc-forfile b {
+  color: var(--ink, #1b1a18);
+  font-weight: 600;
+}
+
+/* grey twin of .cc-send */
+.cc-clear {
+  font: inherit;
+  background: #6b675f;
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: auto;
+  transition: transform 0.14s, filter 0.14s, opacity 0.14s;
+}
+.cc-clear:hover {
+  filter: brightness(1.1);
+  transform: scale(1.01);
+}
+.cc-clear:focus-visible {
+  outline: 2px solid var(--ink-2, #4b4741);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .cc-flagform {
+    grid-template-columns: 1fr;
+  }
+}
