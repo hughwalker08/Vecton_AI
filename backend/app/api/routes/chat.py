@@ -5,16 +5,24 @@ Flow (see planning doc, Part C - Query time):
     1. Embed the incoming question.
     2. Hybrid search (vector + BM25) against Supabase/pgvector.
     3. Rerank top results.
-    4. If nothing relevant enough -> return "no source found" (abstain).
-    5. Otherwise assemble prompt + top chunks and call the LLM.
+    4. If nothing relevant enough AND no document is attached -> return
+       "no source found" (abstain). An attachment is its own source (see
+       generation.py's _ATTACHMENT_ADDENDUM), so a question purely about it
+       must not be abstained on corpus relevance alone -- see ask_question's
+       `strong_match`/`has_attachment` below.
+    5. Otherwise assemble prompt + top chunks (only if they cleared the
+       relevance bar -- irrelevant ones are dropped rather than passed
+       through as unused-but-shown citations) and call the LLM.
     6. Return the cited answer.
 
 Steps 1-3 are app.services.retrieval.retrieve(); step 5 is
 app.services.generation.generate_answer().
 
 Multi-turn: the caller sends prior conversation turns as `history` on each
-request (the frontend keeps the chat's message list client-side -- there's
-no server-side conversation storage). Retrieval only ever searches on the
+request. This backend itself is stateless -- it has no conversation
+storage of its own -- but the frontend persists the chat transcript
+directly to Supabase (see migration 0007) so it survives a refresh; that
+happens independently of this endpoint. Retrieval only ever searches on the
 current question; history is used for generation only, see
 generation.py's module docstring for why.
 
@@ -146,15 +154,26 @@ def ask_question(request: ChatRequest) -> ChatResponse:
     except (EmbeddingError, RerankError) as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    if not chunks or chunks[0]["rerank_score"] < MIN_RERANK_SCORE:
+    # An attachment is a second, independent source (see generation.py's
+    # _ATTACHMENT_ADDENDUM) -- a question purely about it (e.g. "what's in
+    # this report?") has nothing to do with corpus relevance, so it must not
+    # be abstained on the corpus match alone. Below-threshold chunks are
+    # still irrelevant, though: drop them rather than passing them through as
+    # CONTEXT/citations, which would dress up an attachment-only answer with
+    # sources it never actually drew on.
+    has_attachment = bool((request.attachment_text or "").strip())
+    strong_match = bool(chunks) and chunks[0]["rerank_score"] >= MIN_RERANK_SCORE
+
+    if not strong_match and not has_attachment:
         return ChatResponse(answer="No source found.", citations=[], abstained=True)
 
+    context_chunks = chunks if strong_match else []
     history = [{"role": turn.role, "text": turn.text} for turn in request.history]
 
     try:
         answer = generate_answer(
             question,
-            chunks,
+            context_chunks,
             jurisdiction=request.jurisdiction,
             history=history,
             attachment_name=request.attachment_name,
@@ -170,6 +189,6 @@ def ask_question(request: ChatRequest) -> ChatResponse:
 
     return ChatResponse(
         answer=answer,
-        citations=_citations_from(chunks),
+        citations=_citations_from(context_chunks),
         abstained=False,
     )

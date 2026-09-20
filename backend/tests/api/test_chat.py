@@ -176,6 +176,85 @@ def test_ask_question_abstains_when_best_chunk_is_below_the_rerank_floor(client,
     assert response.json()["abstained"] is True
 
 
+def test_ask_question_with_attachment_does_not_abstain_when_no_chunks_found(client, monkeypatch):
+    monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [])
+    received = {}
+
+    def _generate_answer(question, chunks, **kwargs):
+        received["chunks"] = chunks
+        return "This report covers Q3 findings."
+
+    monkeypatch.setattr(chat, "generate_answer", _generate_answer)
+
+    response = client.post(
+        "/api/chat/",
+        json={
+            "question": "What's in this report?",
+            "jurisdiction": "NSW",
+            "attachment_name": "report.pdf",
+            "attachment_text": "Q3 findings...",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["abstained"] is False
+    assert body["answer"] == "This report covers Q3 findings."
+    assert body["citations"] == []
+    assert received["chunks"] == []  # nothing to be relevant, none passed as context
+
+
+def test_ask_question_with_attachment_drops_irrelevant_chunks_as_context_and_citations(
+    client, monkeypatch
+):
+    monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [_chunk(rerank_score=0.01)])
+    received = {}
+
+    def _generate_answer(question, chunks, **kwargs):
+        received["chunks"] = chunks
+        return "This report covers Q3 findings."
+
+    monkeypatch.setattr(chat, "generate_answer", _generate_answer)
+
+    response = client.post(
+        "/api/chat/",
+        json={
+            "question": "What's in this report?",
+            "jurisdiction": "NSW",
+            "attachment_name": "report.pdf",
+            "attachment_text": "Q3 findings...",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["abstained"] is False
+    # The below-floor chunk is real noise, not evidence for this attachment
+    # question -- it must not be sent as context, nor shown as a citation.
+    assert received["chunks"] == []
+    assert body["citations"] == []
+
+
+def test_ask_question_still_abstains_when_attachment_text_is_blank(client, monkeypatch):
+    monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [])
+    called = []
+    monkeypatch.setattr(chat, "generate_answer", lambda *a, **k: called.append(1))
+
+    response = client.post(
+        "/api/chat/",
+        json={
+            "question": "Q",
+            "jurisdiction": "NSW",
+            "attachment_name": "report.pdf",
+            "attachment_text": "   ",
+        },
+    )
+
+    body = response.json()
+    assert body["abstained"] is True
+    assert called == []
+
+
 def test_ask_question_abstains_when_generation_returns_no_answer(client, monkeypatch):
     monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [_chunk()])
     monkeypatch.setattr(chat, "generate_answer", lambda *a, **k: "")
