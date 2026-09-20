@@ -88,7 +88,7 @@ fences, no [link](url) syntax. For a heading or clause label, just write it as i
 followed by a colon (e.g. "Clause H1D4 -- NCC 2025 Volume Two:"). For a list, use a plain dash \
 or number ("- " or "1. ") at the start of the line. For quoted clause text, introduce it with a \
 line like "Clause text:" and put the quote on its own line rather than using a > blockquote. \
-Separate sections and list items with a blank line so they render as distinct paragraphs."""
+Separate sections and list items with a blank line so they render as distinct paragraph"""
 
 # Jurisdiction is collected from the user up front (see api/routes/chat.py:
 # ChatRequest.jurisdiction) and appended here per-request rather than baked

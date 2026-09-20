@@ -97,15 +97,23 @@ built on this side yet (see below).
 
 ## Not yet implemented / known gaps
 
-- **Findings display on the upload flow.** `/api/compliance/analyse` exists
-  on the backend, but `UploadPage.jsx` doesn't call it or show its
-  addressed/contradicted/missing/needs_review results.
-- **Chat history is not persisted.** The sidebar's chat list
-  (`App.jsx`'s `chats` state) is plain in-memory React state, populated only
-  when you start a new chat in this session -- it resets on page refresh,
-  isn't saved anywhere, and the backend sends no prior turns with a
-  question (`/api/chat` is stateless per request). It's a per-session list,
-  not chat history.
+- **Compliance check document text is pasted, not extracted.** The
+  "Compliance Check" section of `UploadPage.jsx` calls
+  `/api/compliance/analyse` and shows its addressed/contradicted/missing/
+  needs_review findings, but the "Document" dropdown there is only a label
+  for which uploaded file the check is about -- it doesn't pull that file's
+  text in automatically. The user has to paste the document text into the
+  textarea themselves (see the next point for why).
 - Upload **text** extraction isn't wired up on the backend yet (LlamaParse
-  sign-off pending), so there's nothing for this UI to display beyond image
-  transcription results even once findings display is built.
+  sign-off pending), so there's nothing to auto-fill the compliance check's
+  document text field with, beyond the image transcription results
+  `/api/upload` already returns.
+- **Chat history is per-session only, not persisted.** `/api/chat` is
+  multi-turn -- the frontend resends up to the last 6 messages of the
+  current chat as `history` on each question (see `api/client.js`,
+  `pages/ChatPage.jsx`), and the backend folds them into the model's
+  context (see `backend/app/services/generation.py`). What's still missing
+  is durability: the sidebar's chat list (`App.jsx`'s `chats` state) is
+  plain in-memory React state, populated only for chats started in this
+  session -- it resets on page refresh and nothing is saved server-side, so
+  there's no way to revisit a chat from a previous visit.
