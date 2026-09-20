@@ -95,12 +95,32 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
     setOpenCitation(null)
     setIsLoading(true)
 
+    // Prior turns only -- newMessage (the question just asked) isn't in
+    // `messages` yet (setMessages above hasn't committed within this closure),
+    // and it's sent separately as the actual question anyway. Built by
+    // pairing each user message with the reply right after it: a pair is
+    // only included when that reply is a real answer, not an error bubble.
+    // Dropping just the error and keeping the orphaned question would send
+    // Gemini two consecutive "user" turns with nothing between them, which
+    // breaks the strict user/model alternation its multi-turn API expects.
+    const history = []
+    for (let i = 0; i < messages.length - 1; i += 2) {
+      const userTurn = messages[i]
+      const replyTurn = messages[i + 1]
+      if (userTurn?.role === 'user' && replyTurn?.role === 'assistant' && !replyTurn.isError) {
+        history.push({ role: 'user', text: userTurn.text })
+        history.push({ role: 'assistant', text: replyTurn.text })
+      }
+    }
+
     try {
-      const response = await askQuestion(
-	trimmedQuestion,
-	jurisdiction,
-	activeAttachment?.status === 'ready' ? { name: activeAttachment.name, text: activeAttachment.text } : null,
-      )
+      const response = await askQuestion(trimmedQuestion, jurisdiction, {
+        history,
+        attachment:
+          activeAttachment?.status === 'ready'
+            ? { name: activeAttachment.name, text: activeAttachment.text }
+            : null,
+      })
 
       const assistantMessage = {
         id: Date.now() + 1,

@@ -116,7 +116,11 @@ describe('App', () => {
     fireEvent.submit(field.closest('form'))
 
     expect(await screen.findByText('Riser height is 190mm max.')).toBeInTheDocument()
-    expect(askQuestion).toHaveBeenCalledWith('What is the max riser height?', 'NSW', null)
+    // First message in a brand-new chat -- no prior turns and nothing attached yet.
+    expect(askQuestion).toHaveBeenCalledWith('What is the max riser height?', 'NSW', {
+      history: [],
+      attachment: null,
+    })
     // The question that started the chat also shows up as the new sidebar entry.
     expect(screen.getByRole('link', { name: 'What is the max riser height?' })).toBeInTheDocument()
   })
@@ -140,8 +144,8 @@ describe('App', () => {
 
     expect(await screen.findByText('Looks compliant.')).toBeInTheDocument()
     expect(askQuestion).toHaveBeenCalledWith('Does my plan comply?', 'NSW', {
-      name: 'site-plan.pdf',
-      text: 'All footings are 300mm deep.',
+      history: [],
+      attachment: { name: 'site-plan.pdf', text: 'All footings are 300mm deep.' },
     })
   })
 
