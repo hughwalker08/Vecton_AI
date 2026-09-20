@@ -18,10 +18,16 @@ importable and side-effect-free so the ingestion pipeline can call it later.
 from __future__ import annotations
 
 import mimetypes
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 
 from app.core.config import settings
+from app.services.gemini_keys import call_with_rotation, quota_wait_hint
+
+# Serialises genai.configure() + generate_content() into one atomic step --
+# see the comment in describe_image_bytes._call.
+_configure_lock = threading.Lock()
 
 # Bump when the prompt changes materially — it is recorded on every output row
 # so you can tell which descriptions need regenerating after a prompt edit.
@@ -95,6 +101,61 @@ requirement the figure does not show.
 commentary, no code fences around the whole answer."""
 
 
+# Gemini's recitation filter (finish_reason 4) blocks a share of NCC figures
+# outright: the main prompt asks for verbatim transcription of labels, which is
+# exactly the behaviour that filter exists to catch, and the NCC is
+# copyrighted. This variant asks for the same six headings and the same facts
+# -- dimensions, part names, spatial arrangement -- but frames the task as
+# recording technical data rather than reproducing the document's text.
+# Measurements and component names are facts, not creative expression.
+#
+# Use it only for figures the main prompt could not get through
+# (`describe_images.py --fallback-prompt --retry-failed`). It is the weaker
+# instruction: the main prompt produces fuller label lists when it works.
+FALLBACK_PROMPT = """You are recording the technical content of an engineering
+figure from an Australian building-code document, so that it can be found by
+search. Report the facts the drawing conveys, in your own words.
+
+Use exactly these headings (omit one only if it genuinely does not apply):
+
+## Figure
+The figure number and title shown at the top of the image.
+
+## Type
+Section drawing, plan view, elevation, isometric, detail, flow chart, decision
+tree, table, graph, map or photograph.
+
+## Description
+What the drawing shows and what it is illustrating. Be concrete about the
+spatial arrangement: which component sits above, below or inside which, the
+order of layers in an assembly, what each arrow indicates, and which two points
+each measurement runs between. A reader who cannot see the drawing should be
+able to picture it.
+
+## Labels and annotations
+The components, materials and parts identified in the drawing, as a bullet
+list. Name each one as the drawing names it. Include any standard or clause
+numbers referenced.
+
+## Dimensions and values
+Every measurement, angle, ratio, tolerance and load shown, with its units and
+what it applies to -- for example "riser height 190 mm maximum, measured from
+the top of one tread to the top of the next". Keep minimum and maximum
+qualifiers. Write "None shown" if the drawing carries no numbers.
+
+## Notes
+Any footnotes, scale markers, or statements about which building classes,
+climate zones or states the drawing applies to.
+
+Rules:
+- Report only what the drawing actually shows. Never infer a dimension, never
+  supply a value from general knowledge of the building code, and never state a
+  requirement the drawing does not depict.
+- Where text is unclear, say so with [illegible] rather than guessing.
+- Use Australian spelling and keep metric units.
+- Plain markdown under the headings above, no preamble or closing commentary."""
+
+
 @dataclass
 class Description:
     """One successful transcription."""
@@ -109,7 +170,10 @@ class ImageDescriptionError(RuntimeError):
 
 
 def build_model(model_name: str | None = None):
-    """Configure and return a Gemini model handle.
+    """Return a Gemini model handle. Does not configure a key itself --
+    `describe_image_bytes` reconfigures the SDK's global client with whichever
+    key the rotator hands it right before each call, since `genai.configure`
+    is process-global rather than per-model.
 
     Imported lazily so `--dry-run` and `--help` work without the SDK installed
     or an API key set.
@@ -121,14 +185,21 @@ def build_model(model_name: str | None = None):
             "google-generativeai is not installed. Run: pip install -r requirements.txt"
         ) from exc
 
-    if not settings.GEMINI_API_KEY:
+    if not settings.gemini_api_keys:
         raise ImageDescriptionError(
             "GEMINI_API_KEY is not set. Copy backend/.env.example to backend/.env "
-            "and fill it in (or export GEMINI_API_KEY)."
+            "and fill it in (or export GEMINI_API_KEY / GEMINI_API_KEYS)."
         )
 
-    genai.configure(api_key=settings.GEMINI_API_KEY)
     return genai.GenerativeModel(model_name or settings.VISION_MODEL_NAME)
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    try:
+        from google.api_core.exceptions import ResourceExhausted, TooManyRequests
+    except ImportError:  # pragma: no cover - environment issue
+        return False
+    return isinstance(exc, (ResourceExhausted, TooManyRequests))
 
 
 def mime_type_for(name: str) -> str:
@@ -219,8 +290,21 @@ image. Use it to interpret what you are looking at, but do not transcribe it
 into ## Labels and annotations or ## Figure unless the same text is actually
 visible in the image itself."""
 
+# When the caption is rendered inside the image -- as it is for figures cropped
+# out of the NCC/ABCB PDFs, where the caption sits at the top of the crop --
+# the fence above makes the model too cautious and it answers "Not shown" under
+# ## Figure. Here the caption is printed text, and should be recorded as such.
+CONTEXT_TEMPLATE_IN_IMAGE = """
 
-def with_caption(prompt: str, caption: str | None) -> str:
+This figure's caption is printed at the top of the image:
+
+    {caption}
+
+Record it under ## Figure exactly as printed. Transcribe the rest of the image
+as normal."""
+
+
+def with_caption(prompt: str, caption: str | None, caption_in_image: bool = False) -> str:
     """Append a caption to the prompt as clearly-external context.
 
     Worth doing: a caption like "Figure 12: Subfloor ventilation detail" tells
@@ -231,7 +315,8 @@ def with_caption(prompt: str, caption: str | None) -> str:
     """
     if not caption or not caption.strip():
         return prompt
-    return prompt + CONTEXT_TEMPLATE.format(caption=caption.strip())
+    template = CONTEXT_TEMPLATE_IN_IMAGE if caption_in_image else CONTEXT_TEMPLATE
+    return prompt + template.format(caption=caption.strip())
 
 
 def describe_image_bytes(
@@ -241,6 +326,7 @@ def describe_image_bytes(
     model_name: str | None = None,
     prompt: str = PROMPT,
     caption: str | None = None,
+    caption_in_image: bool = False,
 ) -> Description:
     """Describe image bytes that may never have touched the filesystem.
 
@@ -250,9 +336,33 @@ def describe_image_bytes(
     payload, mime = prepare_payload(data, name)
 
     handle = model if model is not None else build_model(model_name)
-    response = handle.generate_content(
-        [with_caption(prompt, caption), {"mime_type": mime, "data": payload}]
-    )
+    contents = [with_caption(prompt, caption), {"mime_type": mime, "data": payload}]
+
+    def _call(key: str):
+        import google.generativeai as genai
+
+        # google-generativeai keeps its configured key as process-global
+        # state (unlike the newer google-genai SDK's per-Client key), so the
+        # configure + call has to be one atomic step -- otherwise a second
+        # thread rotating keys between them would make this call fire under
+        # the wrong key.
+        with _configure_lock:
+            genai.configure(api_key=key)
+            try:
+                return handle.generate_content(contents)
+            except Exception as exc:
+                if _is_quota_error(exc):
+                    raise
+                raise ImageDescriptionError(f"Gemini request failed: {exc}") from exc
+
+    try:
+        response = call_with_rotation(_is_quota_error, _call)
+    except Exception as exc:
+        if _is_quota_error(exc):
+            raise ImageDescriptionError(
+                "Gemini's usage limit has been reached for now." + quota_wait_hint(exc)
+            ) from exc
+        raise
 
     text = (getattr(response, "text", None) or "").strip()
     if not text:
@@ -271,12 +381,16 @@ def describe_image(
     model=None,
     model_name: str | None = None,
     prompt: str = PROMPT,
+    caption: str | None = None,
+    caption_in_image: bool = False,
 ) -> Description:
     """Return a text description of the image at `path`.
 
     Pass a pre-built `model` when describing many images so the handle is
-    reused; otherwise one is built per call.
+    reused; otherwise one is built per call. `caption` is the label the source
+    document gave this figure, passed to the model as fenced external context.
     """
     return describe_image_bytes(
-        path.read_bytes(), path.name, model=model, model_name=model_name, prompt=prompt
+        path.read_bytes(), path.name, model=model, model_name=model_name,
+        prompt=prompt, caption=caption, caption_in_image=caption_in_image,
     )

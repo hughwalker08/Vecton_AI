@@ -24,7 +24,6 @@ becomes this module's caller.
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -34,12 +33,13 @@ from google.genai import types
 from pydantic import BaseModel, ValidationError
 
 from app.core.config import settings
+from app.services.gemini_keys import call_with_rotation, quota_wait_hint
 from app.services.retrieval import retrieve
 
 Status = Literal["addressed", "missing", "contradicted", "needs_review"]
 STATUSES: tuple[Status, ...] = ("addressed", "missing", "contradicted", "needs_review")
 
-_client: genai.Client | None = None
+_clients: dict[str, genai.Client] = {}
 
 SYSTEM_INSTRUCTION = """You are a construction compliance analysis engine for the Australian \
 National Construction Code (NCC) 2025 Volume Two and the ABCB Housing Provisions.
@@ -106,22 +106,16 @@ class QuotaExceededError(ComplianceAnalysisError):
     """Raised when Gemini's rate limit or daily quota has been used up."""
 
 
-def _quota_wait_hint(exc: Exception) -> str:
-    """Pull a retry delay out of a 429's error body, if one is given."""
-    match = re.search(r"retryDelay['\"]?\s*:\s*['\"]?(\d+)", str(exc))
-    return f" Try again in about {match.group(1)}s." if match else ""
+def _is_quota_error(exc: Exception) -> bool:
+    return isinstance(exc, genai_errors.APIError) and (
+        exc.code == 429 or exc.status == "RESOURCE_EXHAUSTED"
+    )
 
 
-def _get_client() -> genai.Client:
-    global _client
-    if not settings.GEMINI_API_KEY:
-        raise ComplianceAnalysisError(
-            "GEMINI_API_KEY is not set. Copy backend/.env.example to backend/.env "
-            "and fill it in (or export GEMINI_API_KEY)."
-        )
-    if _client is None:
-        _client = genai.Client(api_key=settings.GEMINI_API_KEY, http_options=_HTTP_OPTIONS)
-    return _client
+def _client_for(key: str) -> genai.Client:
+    if key not in _clients:
+        _clients[key] = genai.Client(api_key=key, http_options=_HTTP_OPTIONS)
+    return _clients[key]
 
 
 @dataclass
@@ -197,30 +191,41 @@ def _classify(document_text: str, chunks: list[dict]) -> dict[str, _FindingLLM]:
     simply won't be a key, which the caller turns into a "needs_review"
     finding rather than dropping it.
     """
-    client = _get_client()
+    if not settings.gemini_api_keys:
+        raise ComplianceAnalysisError(
+            "GEMINI_API_KEY is not set. Copy backend/.env.example to backend/.env "
+            "and fill it in (or export GEMINI_API_KEY / GEMINI_API_KEYS)."
+        )
     user_content = _build_user_content(document_text, chunks)
 
+    def _call(key: str):
+        client = _client_for(key)
+        try:
+            return client.models.generate_content(
+                model=settings.LLM_MODEL_NAME,
+                contents=user_content,
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_INSTRUCTION,
+                    temperature=0,
+                    max_output_tokens=_MAX_OUTPUT_TOKENS,
+                    thinking_config=_THINKING_CONFIG,
+                    response_mime_type="application/json",
+                    response_schema=list[_FindingLLM],
+                ),
+            )
+        except genai_errors.APIError as exc:
+            if _is_quota_error(exc):
+                raise
+            raise ComplianceAnalysisError(f"Gemini request failed: {exc}") from exc
+        except Exception as exc:
+            raise ComplianceAnalysisError(f"Gemini request failed: {exc}") from exc
+
     try:
-        response = client.models.generate_content(
-            model=settings.LLM_MODEL_NAME,
-            contents=user_content,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
-                temperature=0,
-                max_output_tokens=_MAX_OUTPUT_TOKENS,
-                thinking_config=_THINKING_CONFIG,
-                response_mime_type="application/json",
-                response_schema=list[_FindingLLM],
-            ),
-        )
+        response = call_with_rotation(_is_quota_error, _call)
     except genai_errors.APIError as exc:
-        if exc.code == 429 or exc.status == "RESOURCE_EXHAUSTED":
-            raise QuotaExceededError(
-                "Gemini's usage limit has been reached for now." + _quota_wait_hint(exc)
-            ) from exc
-        raise ComplianceAnalysisError(f"Gemini request failed: {exc}") from exc
-    except Exception as exc:
-        raise ComplianceAnalysisError(f"Gemini request failed: {exc}") from exc
+        raise QuotaExceededError(
+            "Gemini's usage limit has been reached for now." + quota_wait_hint(exc)
+        ) from exc
 
     if response.prompt_feedback and response.prompt_feedback.block_reason:
         raise ComplianceAnalysisError(

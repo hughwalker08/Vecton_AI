@@ -16,16 +16,15 @@ grounding), which the system instruction is written to refuse to do.
 
 from __future__ import annotations
 
-import re
-
 from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 from pydantic import ValidationError
 
 from app.core.config import settings
+from app.services.gemini_keys import call_with_rotation, quota_wait_hint
 
-_client: genai.Client | None = None
+_clients: dict[str, genai.Client] = {}
 
 # Behavioural rules live in the system instruction (sent once per request,
 # separate from the user turn) rather than being concatenated into the
@@ -134,24 +133,18 @@ class QuotaExceededError(GenerationError):
     """Raised when Gemini's rate limit or daily quota has been used up."""
 
 
-def _quota_wait_hint(exc: Exception) -> str:
-    """Pull a retry delay out of a 429's error body, if one is given."""
-    match = re.search(r"retryDelay['\"]?\s*:\s*['\"]?(\d+)", str(exc))
-    return f" Try again in about {match.group(1)}s." if match else ""
+def _is_quota_error(exc: Exception) -> bool:
+    return isinstance(exc, genai_errors.APIError) and (
+        exc.code == 429 or exc.status == "RESOURCE_EXHAUSTED"
+    )
 
 
-def _get_client() -> genai.Client:
-    global _client
-    if not settings.GEMINI_API_KEY:
-        raise GenerationError(
-            "GEMINI_API_KEY is not set. Copy backend/.env.example to backend/.env "
-            "and fill it in (or export GEMINI_API_KEY)."
-        )
-    if _client is None:
-        # Keep a process-wide client so connection pooling/keep-alive is
-        # reused across requests instead of reconnecting every call.
-        _client = genai.Client(api_key=settings.GEMINI_API_KEY, http_options=_HTTP_OPTIONS)
-    return _client
+def _client_for(key: str) -> genai.Client:
+    # Keep one client per key, process-wide, so connection pooling/keep-alive
+    # is reused across requests instead of reconnecting every call.
+    if key not in _clients:
+        _clients[key] = genai.Client(api_key=key, http_options=_HTTP_OPTIONS)
+    return _clients[key]
 
 
 def _format_chunk(chunk: dict) -> str:
@@ -199,29 +192,39 @@ def generate_answer(question: str, chunks: list[dict], jurisdiction: str | None 
     instruction so the model applies jurisdiction-qualified clauses correctly
     instead of just citing whatever the context happens to contain.
     """
-    client = _get_client()
+    if not settings.gemini_api_keys:
+        raise GenerationError(
+            "GEMINI_API_KEY is not set. Copy backend/.env.example to backend/.env "
+            "and fill it in (or export GEMINI_API_KEY / GEMINI_API_KEYS)."
+        )
     user_content = _build_user_content(question, chunks)
 
+    def _call(key: str):
+        client = _client_for(key)
+        try:
+            return client.models.generate_content(
+                model=settings.LLM_MODEL_NAME,
+                contents=user_content,
+                config=types.GenerateContentConfig(
+                    system_instruction=_build_system_instruction(jurisdiction),
+                    temperature=0,
+                    max_output_tokens=_MAX_OUTPUT_TOKENS,
+                    thinking_config=_THINKING_CONFIG,
+                ),
+            )
+        except genai_errors.APIError as exc:
+            if _is_quota_error(exc):
+                raise
+            raise GenerationError(f"Gemini request failed: {exc}") from exc
+        except Exception as exc:
+            raise GenerationError(f"Gemini request failed: {exc}") from exc
+
     try:
-        response = client.models.generate_content(
-            model=settings.LLM_MODEL_NAME,
-            contents=user_content,
-            config=types.GenerateContentConfig(
-                system_instruction=_build_system_instruction(jurisdiction),
-                temperature=0,
-                max_output_tokens=_MAX_OUTPUT_TOKENS,
-                thinking_config=_THINKING_CONFIG,
-            ),
-        )
+        response = call_with_rotation(_is_quota_error, _call)
     except genai_errors.APIError as exc:
-        if exc.code == 429 or exc.status == "RESOURCE_EXHAUSTED":
-            raise QuotaExceededError(
-                "Gemini's usage limit has been reached for now."
-                + _quota_wait_hint(exc)
-            ) from exc
-        raise GenerationError(f"Gemini request failed: {exc}") from exc
-    except Exception as exc:
-        raise GenerationError(f"Gemini request failed: {exc}") from exc
+        raise QuotaExceededError(
+            "Gemini's usage limit has been reached for now." + quota_wait_hint(exc)
+        ) from exc
 
     if response.prompt_feedback and response.prompt_feedback.block_reason:
         raise GenerationError(

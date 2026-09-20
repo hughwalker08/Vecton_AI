@@ -72,3 +72,33 @@ def test_settings_is_a_module_level_singleton():
     from app.core.config import settings
 
     assert isinstance(settings, Settings)
+
+
+def test_gemini_api_keys_falls_back_to_single_key():
+    settings = _settings(GEMINI_API_KEY="solo-key")
+
+    assert settings.gemini_api_keys == ["solo-key"]
+
+
+def test_gemini_api_keys_parses_comma_separated_list():
+    settings = _settings(GEMINI_API_KEYS="key1, key2 ,key3")
+
+    assert settings.gemini_api_keys == ["key1", "key2", "key3"]
+
+
+def test_gemini_api_keys_plural_overrides_singular():
+    settings = _settings(GEMINI_API_KEY="solo-key", GEMINI_API_KEYS="key1,key2")
+
+    assert settings.gemini_api_keys == ["key1", "key2"]
+
+
+def test_gemini_api_keys_deduplicates_while_keeping_order():
+    settings = _settings(GEMINI_API_KEYS="key1,key2,key1")
+
+    assert settings.gemini_api_keys == ["key1", "key2"]
+
+
+def test_gemini_api_keys_empty_when_nothing_configured():
+    settings = _settings()
+
+    assert settings.gemini_api_keys == []
