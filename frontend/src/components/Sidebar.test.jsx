@@ -193,17 +193,4 @@ describe('Sidebar', () => {
 
     expect(onCreateProject).toHaveBeenCalledWith('Wattle Court build')
   })
-
-  it('on the Projects tab, "New chat"/"Upload documents" come after the project list', () => {
-    renderSidebar({ projects: [{ id: 'p1', name: 'Wattle Court build' }] })
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Projects' }))
-
-    const order = screen
-      .getAllByRole('link')
-      .map((el) => el.textContent)
-      .filter((text) => ['Wattle Court build', 'New chat', 'Upload documents'].includes(text))
-
-    expect(order).toEqual(['Wattle Court build', 'New chat', 'Upload documents'])
-  })
 })

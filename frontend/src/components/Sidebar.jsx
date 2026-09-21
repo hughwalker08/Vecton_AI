@@ -58,39 +58,6 @@ export default function Sidebar({ chats = [], files = [], projects = [], onCreat
   const isHome = location.pathname === '/'
   const isUpload = location.pathname.startsWith('/upload')
 
-  // Rendered right after the tab switcher on the Ask tab (its usual spot),
-  // but after the Projects list on the Projects tab -- project creation
-  // takes priority there, per feedback on the ordering.
-  const navLinks = (
-    <div className="nav-list">
-      <Link
-        to="/"
-        className="nav-item"
-        aria-current={isHome}
-        onClick={() => {
-          setFilter('')
-          closeMenu()
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
-        New chat
-      </Link>
-      <Link to="/upload" className="nav-item" aria-current={isUpload} onClick={closeMenu}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l1.8 2H19a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5v-10Z"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinejoin="round"
-          />
-        </svg>
-        Upload documents
-      </Link>
-    </div>
-  )
-
   return (
     <>
       <button
@@ -157,7 +124,38 @@ export default function Sidebar({ chats = [], files = [], projects = [], onCreat
             </button>
           </div>
 
-          {activeTab === 'ask' && navLinks}
+          <div className="nav-list">
+            <Link
+              to="/"
+              className="nav-item"
+              aria-current={isHome}
+              onClick={() => {
+                setFilter('')
+                closeMenu()
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+              New chat
+            </Link>
+            <Link
+              to="/upload"
+              className="nav-item"
+              aria-current={isUpload}
+              onClick={closeMenu}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l1.8 2H19a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5v-10Z"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Upload documents
+            </Link>
+          </div>
         </div>
 
         <nav className="tree">
@@ -251,9 +249,6 @@ export default function Sidebar({ chats = [], files = [], projects = [], onCreat
                   </Link>
                 ))
               )}
-
-              <div className="tree-divider" />
-              {navLinks}
             </>
           )}
         </nav>
