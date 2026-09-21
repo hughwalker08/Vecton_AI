@@ -183,6 +183,11 @@
   padding: 14px 8px 6px;
 }
 
+.tree-divider {
+  border-top: 1px solid var(--rule, #e6e3dd);
+  margin: 16px 4px 12px;
+}
+
 .tree-empty {
   padding: 6px 8px;
   margin: 0;
