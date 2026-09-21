@@ -18,6 +18,7 @@ export default function App() {
   const [isProfileLoading, setIsProfileLoading] = useState(false)
   const [chats, setChats] = useState([])
   const [uploadedFiles, setUploadedFiles] = useState([])
+  const [folders, setFolders] = useState([])
 
   function createChat(question, jurisdiction) {
     const id = crypto.randomUUID()
@@ -56,6 +57,46 @@ export default function App() {
     }
 
     loadChats()
+  }, [session])
+
+  // Same reload-on-session pattern as loadChats above (see migration 0009):
+  // "Project files" and its folders previously lived only in this tab's
+  // React state and reset on every refresh.
+  useEffect(() => {
+    async function loadDocuments() {
+      if (!session?.user?.id) {
+        setUploadedFiles([])
+        setFolders([])
+        return
+      }
+
+      const [foldersResult, documentsResult] = await Promise.all([
+        supabase.from('folders').select('id, name').order('created_at', { ascending: true }),
+        supabase
+          .from('documents')
+          .select('id, folder_id, name, size, status, detail, text, created_at')
+          .order('created_at', { ascending: false }),
+      ])
+
+      if (foldersResult.error) console.error(foldersResult.error)
+      if (documentsResult.error) console.error(documentsResult.error)
+
+      setFolders(foldersResult.data ?? [])
+      setUploadedFiles(
+        (documentsResult.data ?? []).map((row) => ({
+          id: row.id,
+          folderId: row.folder_id,
+          name: row.name,
+          size: row.size,
+          status: row.status,
+          detail: row.detail,
+          text: row.text,
+          uploadedAt: new Date(row.created_at),
+        })),
+      )
+    }
+
+    loadDocuments()
   }, [session])
 
   useEffect(() => {
@@ -155,7 +196,16 @@ export default function App() {
 	    />
             <Route
               path="/upload"
-              element={<UploadPage files={uploadedFiles} setFiles={setUploadedFiles} />}
+              element={
+                <UploadPage
+                  files={uploadedFiles}
+                  setFiles={setUploadedFiles}
+                  folders={folders}
+                  setFolders={setFolders}
+                  jurisdiction={profile.jurisdiction}
+                  userId={session.user.id}
+                />
+              }
             />
           </Routes>
         </div>

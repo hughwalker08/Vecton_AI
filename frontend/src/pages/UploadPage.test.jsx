@@ -6,12 +6,34 @@ vi.mock('../api/client.js', () => ({
   uploadDocument: vi.fn(),
 }))
 
+// UploadPage persists documents/folders to Supabase (see migration 0009).
+// None of these tests exercise persistence itself; this just keeps them
+// from making real network calls, with every write resolving successfully.
+vi.mock('../lib/supabase.js', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      insert: () => Promise.resolve({ error: null }),
+      update: () => ({ eq: () => Promise.resolve({ error: null }) }),
+      delete: () => ({ eq: () => Promise.resolve({ error: null }) }),
+    })),
+  },
+}))
+
 import { uploadDocument } from '../api/client.js'
 
-function renderUploadPage(files = []) {
+function renderUploadPage(files = [], { folders = [] } = {}) {
   const setFiles = vi.fn()
-  const utils = render(<UploadPage files={files} setFiles={setFiles} />)
-  return { ...utils, setFiles }
+  const setFolders = vi.fn()
+  const utils = render(
+    <UploadPage
+      files={files}
+      setFiles={setFiles}
+      folders={folders}
+      setFolders={setFolders}
+      userId="user-1"
+    />,
+  )
+  return { ...utils, setFiles, setFolders }
 }
 
 // UploadPage manages its file list via the setFiles updater App.jsx owns;
@@ -150,7 +172,7 @@ describe('UploadPage', () => {
       },
     ])
 
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText(/document \(optional\)/i), { target: { value: '1' } })
 
     expect(screen.getByLabelText('Document text')).toHaveValue('All footings are 300mm deep.')
   })
@@ -169,8 +191,63 @@ describe('UploadPage', () => {
     ])
 
     fireEvent.change(screen.getByLabelText('Document text'), { target: { value: 'Manually typed text.' } })
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '1' } })
+    fireEvent.change(screen.getByLabelText(/document \(optional\)/i), { target: { value: '1' } })
 
     expect(screen.getByLabelText('Document text')).toHaveValue('Manually typed text.')
+  })
+
+  it('creates a folder via the "+ New folder" control', () => {
+    const { setFolders } = renderUploadPage([])
+
+    fireEvent.click(screen.getByRole('button', { name: '+ New folder' }))
+    fireEvent.change(screen.getByLabelText('New folder name'), { target: { value: 'Site plans' } })
+    fireEvent.submit(screen.getByLabelText('New folder name').closest('form'))
+
+    expect(setFolders).toHaveBeenCalled()
+    const next = applyUpdater([], setFolders)
+    expect(next).toHaveLength(1)
+    expect(next[0].name).toBe('Site plans')
+  })
+
+  it('moving a document to a folder updates its folderId', () => {
+    const initial = [
+      { id: 1, name: 'plan.pdf', size: 1024, uploadedAt: new Date(), status: 'done', detail: 'ok', folderId: null },
+    ]
+    const { setFiles } = renderUploadPage(initial, { folders: [{ id: 'f1', name: 'Site plans' }] })
+
+    fireEvent.change(screen.getByLabelText('Move plan.pdf to a folder'), { target: { value: 'f1' } })
+
+    expect(setFiles).toHaveBeenCalled()
+    expect(applyUpdater(initial, setFiles)[0].folderId).toBe('f1')
+  })
+
+  it('filtering by a folder shows only that folder\'s documents', () => {
+    renderUploadPage(
+      [
+        { id: 1, name: 'plan.pdf', size: 1024, uploadedAt: new Date(), status: 'done', detail: 'ok', folderId: 'f1' },
+        { id: 2, name: 'report.pdf', size: 1024, uploadedAt: new Date(), status: 'done', detail: 'ok', folderId: null },
+      ],
+      { folders: [{ id: 'f1', name: 'Site plans' }] },
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Site plans' }))
+
+    const list = document.querySelector('.list')
+    expect(within(list).getByText('plan.pdf')).toBeInTheDocument()
+    expect(within(list).queryByText('report.pdf')).not.toBeInTheDocument()
+  })
+
+  it('deleting a folder un-files its documents rather than deleting them', () => {
+    const initialFiles = [
+      { id: 1, name: 'plan.pdf', size: 1024, uploadedAt: new Date(), status: 'done', detail: 'ok', folderId: 'f1' },
+    ]
+    const initialFolders = [{ id: 'f1', name: 'Site plans' }]
+    const { setFiles, setFolders } = renderUploadPage(initialFiles, { folders: initialFolders })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Site plans' })) // select it to reveal its actions
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Site plans' }))
+
+    expect(applyUpdater(initialFolders, setFolders)).toHaveLength(0)
+    expect(applyUpdater(initialFiles, setFiles)[0].folderId).toBeNull()
   })
 })

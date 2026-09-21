@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { analyseDocument, flagFinding, uploadDocument } from '../api/client.js'
+import { supabase } from '../lib/supabase.js'
 import './UploadPage.css'
 import SourcePanel from '../components/SourcePanel.jsx'
 
@@ -35,8 +36,6 @@ function formatDate(date) {
     year: 'numeric',
   })
 }
-
-let nextId = 1
 
 function FindingCard({ finding, query, onViewSource }) {
   const [flagOpen, setFlagOpen] = useState(false)
@@ -151,7 +150,7 @@ function FindingCard({ finding, query, onViewSource }) {
 }
 
 // `jurisdiction` is the code chosen during onboarding (ACT, NSW, ... or empty).
-function ComplianceCheck({ jurisdiction, files }) {
+function ComplianceCheck({ jurisdiction, files, folders = [] }) {
   const [query, setQuery] = useState('')
   const [documentText, setDocumentText] = useState('')
 
@@ -171,6 +170,17 @@ function ComplianceCheck({ jurisdiction, files }) {
   const fileValue = uploadedFiles.some((f) => String(f.id) === selectedFileId)
     ? selectedFileId
     : ''
+
+  // Grouped into <optgroup>s by folder, unfiled documents last -- a group
+  // with nothing in it isn't shown at all.
+  const fileGroups = [
+    ...folders.map((folder) => ({
+      key: folder.id,
+      label: folder.name,
+      files: uploadedFiles.filter((f) => f.folderId === folder.id),
+    })),
+    { key: 'unfiled', label: 'Unfiled', files: uploadedFiles.filter((f) => !f.folderId) },
+  ].filter((group) => group.files.length > 0)
 
   // Cycle the status text while a request is in flight.
   useEffect(() => {
@@ -262,10 +272,14 @@ function ComplianceCheck({ jurisdiction, files }) {
             <option value="">
               {uploadedFiles.length === 0 ? 'No uploaded documents yet' : 'Select a document'}
             </option>
-            {uploadedFiles.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
+            {fileGroups.map((group) => (
+              <optgroup key={group.key} label={group.label}>
+                {group.files.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
           <span className="cc-hint">
@@ -380,47 +394,70 @@ function ComplianceCheck({ jurisdiction, files }) {
   )
 }
 
-export default function UploadPage({ files, setFiles, jurisdiction }) {
+export default function UploadPage({ files, setFiles, folders = [], setFolders, jurisdiction, userId }) {
   const [isDragging, setIsDragging] = useState(false)
+  // '' = All, 'unfiled' = no folder, else a folders.id.
+  const [activeFolderId, setActiveFolderId] = useState('')
+  const [isAddingFolder, setIsAddingFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [renamingFolderId, setRenamingFolderId] = useState(null)
+  const [renameValue, setRenameValue] = useState('')
   const inputRef = useRef(null)
+
+  function logIfError({ error }) {
+    if (error) console.error(error)
+  }
 
   function addFiles(fileList) {
     const incoming = Array.from(fileList || [])
     if (incoming.length === 0) return
 
+    // A new file lands in the folder currently being viewed (Unfiled/All both
+    // mean "no folder" here -- there's no meaningful folder to assign from
+    // the All view either).
+    const folderId = activeFolderId && activeFolderId !== 'unfiled' ? activeFolderId : null
+
     const records = incoming.map((file) => ({
-      id: nextId++,
+      id: crypto.randomUUID(),
       file,
       name: file.name,
       size: file.size,
       uploadedAt: new Date(),
       status: 'uploading',
       detail: 'Uploading…',
+      folderId,
     }))
 
     setFiles((current) => [...records, ...current])
-    records.forEach(processUpload)
+    records.forEach((record) => {
+      supabase
+        .from('documents')
+        .insert({
+          id: record.id,
+          user_id: userId,
+          folder_id: record.folderId,
+          name: record.name,
+          size: record.size,
+          status: 'uploading',
+          detail: record.detail,
+        })
+        .then(logIfError)
+      processUpload(record)
+    })
   }
 
   async function processUpload(record) {
     try {
       const response = await uploadDocument(record.file)
+      const update = { status: 'done', detail: response.status, text: response.text_extraction }
 
-      setFiles((current) =>
-        current.map((f) =>
-          f.id === record.id
-            ? { ...f, status: 'done', detail: response.status, text: response.text_extraction }
-            : f,
-        ),
-      )
+      setFiles((current) => current.map((f) => (f.id === record.id ? { ...f, ...update } : f)))
+      supabase.from('documents').update(update).eq('id', record.id).then(logIfError)
     } catch (error) {
-      setFiles((current) =>
-        current.map((f) =>
-          f.id === record.id
-            ? { ...f, status: 'error', detail: error.message || 'Upload failed.' }
-            : f,
-        ),
-      )
+      const update = { status: 'error', detail: error.message || 'Upload failed.' }
+
+      setFiles((current) => current.map((f) => (f.id === record.id ? { ...f, ...update } : f)))
+      supabase.from('documents').update(update).eq('id', record.id).then(logIfError)
     }
   }
 
@@ -437,7 +474,53 @@ export default function UploadPage({ files, setFiles, jurisdiction }) {
 
   function removeFile(id) {
     setFiles((current) => current.filter((f) => f.id !== id))
+    supabase.from('documents').delete().eq('id', id).then(logIfError)
   }
+
+  function moveFile(id, folderId) {
+    setFiles((current) => current.map((f) => (f.id === id ? { ...f, folderId: folderId || null } : f)))
+    supabase
+      .from('documents')
+      .update({ folder_id: folderId || null })
+      .eq('id', id)
+      .then(logIfError)
+  }
+
+  function addFolder() {
+    const name = newFolderName.trim()
+    if (!name) return
+    const id = crypto.randomUUID()
+
+    setFolders((current) => [...current, { id, name }])
+    setIsAddingFolder(false)
+    setNewFolderName('')
+    supabase.from('folders').insert({ id, user_id: userId, name }).then(logIfError)
+  }
+
+  function renameFolder(id) {
+    const name = renameValue.trim()
+    setRenamingFolderId(null)
+    if (!name) return
+
+    setFolders((current) => current.map((f) => (f.id === id ? { ...f, name } : f)))
+    supabase.from('folders').update({ name }).eq('id', id).then(logIfError)
+  }
+
+  function deleteFolder(id) {
+    // Un-file its documents locally to match the DB's ON DELETE SET NULL,
+    // rather than leaving them pointed at a folder that no longer exists.
+    setFolders((current) => current.filter((f) => f.id !== id))
+    setFiles((current) => current.map((f) => (f.folderId === id ? { ...f, folderId: null } : f)))
+    if (activeFolderId === id) setActiveFolderId('')
+
+    supabase.from('folders').delete().eq('id', id).then(logIfError)
+  }
+
+  const visibleFiles = files.filter((f) => {
+    if (activeFolderId === '') return true
+    if (activeFolderId === 'unfiled') return !f.folderId
+    return f.folderId === activeFolderId
+  })
 
   return (
     <main className="upload-page">
@@ -454,6 +537,110 @@ export default function UploadPage({ files, setFiles, jurisdiction }) {
               <span>document{files.length === 1 ? '' : 's'}</span>
             </div>
           </div>
+        </div>
+
+        <div className="folder-bar" role="tablist" aria-label="Filter documents by folder">
+          <button
+            type="button"
+            className="folder-pill"
+            aria-pressed={activeFolderId === ''}
+            onClick={() => setActiveFolderId('')}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className="folder-pill"
+            aria-pressed={activeFolderId === 'unfiled'}
+            onClick={() => setActiveFolderId('unfiled')}
+          >
+            Unfiled
+          </button>
+
+          {folders.map((folder) =>
+            renamingFolderId === folder.id ? (
+              <form
+                key={folder.id}
+                className="folder-rename"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  renameFolder(folder.id)
+                }}
+              >
+                <input
+                  autoFocus
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={() => renameFolder(folder.id)}
+                  aria-label={`Rename folder ${folder.name}`}
+                />
+              </form>
+            ) : (
+              <span className="folder-pill-wrap" key={folder.id}>
+                <button
+                  type="button"
+                  className="folder-pill"
+                  aria-pressed={activeFolderId === folder.id}
+                  onClick={() => setActiveFolderId(folder.id)}
+                >
+                  {folder.name}
+                </button>
+                {activeFolderId === folder.id && (
+                  <span className="folder-pill-actions">
+                    <button
+                      type="button"
+                      aria-label={`Rename ${folder.name}`}
+                      onClick={() => {
+                        setRenamingFolderId(folder.id)
+                        setRenameValue(folder.name)
+                      }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M4 20l1-4L16 5l3 3L8 19l-4 1Z"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Delete ${folder.name}`}
+                      onClick={() => deleteFolder(folder.id)}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
+                        <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  </span>
+                )}
+              </span>
+            ),
+          )}
+
+          {isAddingFolder ? (
+            <form
+              className="folder-new"
+              onSubmit={(e) => {
+                e.preventDefault()
+                addFolder()
+              }}
+            >
+              <input
+                autoFocus
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                onBlur={() => (newFolderName.trim() ? addFolder() : setIsAddingFolder(false))}
+                placeholder="Folder name"
+                aria-label="New folder name"
+              />
+            </form>
+          ) : (
+            <button type="button" className="folder-add" onClick={() => setIsAddingFolder(true)}>
+              + New folder
+            </button>
+          )}
         </div>
 
         <div
@@ -500,13 +687,17 @@ export default function UploadPage({ files, setFiles, jurisdiction }) {
         </div>
 
         <div className="list">
-          {files.length === 0 ? (
+          {visibleFiles.length === 0 ? (
             <div className="empty">
-              <p>No documents uploaded yet</p>
-              <span>Files you upload in this session will show up here.</span>
+              <p>{files.length === 0 ? 'No documents uploaded yet' : 'No documents in this folder'}</p>
+              <span>
+                {files.length === 0
+                  ? 'Files you upload will show up here.'
+                  : 'Upload a document while this folder is selected, or move one in.'}
+              </span>
             </div>
           ) : (
-            files.map((record) => (
+            visibleFiles.map((record) => (
               <div className="item" key={record.id}>
                 <svg className="ico" width="15" height="15" viewBox="0 0 24 24" fill="none">
                   <path
@@ -530,6 +721,21 @@ export default function UploadPage({ files, setFiles, jurisdiction }) {
                   </span>
                 </span>
 
+                <select
+                  className="item-folder"
+                  aria-label={`Move ${record.name} to a folder`}
+                  value={record.folderId || ''}
+                  onChange={(e) => moveFile(record.id, e.target.value || null)}
+                  disabled={folders.length === 0}
+                >
+                  <option value="">Unfiled</option>
+                  {folders.map((folder) => (
+                    <option key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </option>
+                  ))}
+                </select>
+
                 <span className="when">{formatDate(record.uploadedAt)}</span>
 
                 <button
@@ -552,7 +758,7 @@ export default function UploadPage({ files, setFiles, jurisdiction }) {
           )}
         </div>
 
-        <ComplianceCheck jurisdiction={jurisdiction} files={files}/>
+        <ComplianceCheck jurisdiction={jurisdiction} files={files} folders={folders} />
       </div>
     </main>
   )
