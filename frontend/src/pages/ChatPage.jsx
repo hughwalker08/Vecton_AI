@@ -60,6 +60,10 @@ export default function ChatPage({ chats = [], defaultJurisdiction, userId }) {
     chats.find((chat) => chat.id === chatId)?.jurisdiction ||
     location.state?.jurisdiction ||
     defaultJurisdiction
+  // Optional project this chat was started from (see App.jsx's createChat and
+  // ProjectPage) -- null for a chat started outside any project, same as an
+  // unfiled document has no folder.
+  const projectId = chats.find((chat) => chat.id === chatId)?.projectId ?? null
 
   useEffect(() => {
     if (!isLoading) {
@@ -137,7 +141,7 @@ export default function ChatPage({ chats = [], defaultJurisdiction, userId }) {
     ensuredChatId.current = chatId
 
     const { error } = await supabase.from('conversations').upsert(
-      { id: chatId, user_id: userId, title: deriveChatTitle(firstQuestion), jurisdiction },
+      { id: chatId, user_id: userId, title: deriveChatTitle(firstQuestion), jurisdiction, project_id: projectId },
       { onConflict: 'id', ignoreDuplicates: true },
     )
 

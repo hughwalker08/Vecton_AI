@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link, useLocation, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import './Sidebar.css'
 
@@ -9,11 +9,17 @@ function getInitials(email) {
   return name.slice(0, 2).toUpperCase()
 }
 
-export default function Sidebar({ chats = [], files = [], userEmail }) {
-  const { chatId: activeChatId } = useParams()
+export default function Sidebar({ chats = [], files = [], projects = [], onCreateProject, userEmail }) {
+  const { chatId: activeChatId, projectId: activeProjectId } = useParams()
   const location = useLocation()
+  const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
   const [filter, setFilter] = useState('')
+  // 'ask' = the existing Documents/Earlier-questions tree; 'projects' = the
+  // optional grouping layer above chats/folders (migration 0010).
+  const [activeTab, setActiveTab] = useState('ask')
+  const [isAddingProject, setIsAddingProject] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
 
   function toggleMenu() {
     setIsOpen(!isOpen)
@@ -28,6 +34,19 @@ export default function Sidebar({ chats = [], files = [], userEmail }) {
     // profile and swaps back to LoginPage once this resolves -- no local
     // state to reset here.
     await supabase.auth.signOut()
+  }
+
+  function submitNewProject() {
+    const name = newProjectName.trim()
+    setIsAddingProject(false)
+    if (!name) return
+
+    const id = onCreateProject?.(name)
+    setNewProjectName('')
+    if (id) {
+      navigate(`/project/${id}`)
+      closeMenu()
+    }
   }
 
   const filteredChats = useMemo(() => {
@@ -84,6 +103,27 @@ export default function Sidebar({ chats = [], files = [], userEmail }) {
             />
           </label>
 
+          <div className="nav-tabs" role="tablist" aria-label="Sidebar view">
+            <button
+              type="button"
+              className="nav-tab"
+              role="tab"
+              aria-selected={activeTab === 'ask'}
+              onClick={() => setActiveTab('ask')}
+            >
+              Ask
+            </button>
+            <button
+              type="button"
+              className="nav-tab"
+              role="tab"
+              aria-selected={activeTab === 'projects'}
+              onClick={() => setActiveTab('projects')}
+            >
+              Projects
+            </button>
+          </div>
+
           <div className="nav-list">
             <Link
               to="/"
@@ -119,50 +159,97 @@ export default function Sidebar({ chats = [], files = [], userEmail }) {
         </div>
 
         <nav className="tree">
-          <div className="tree-label">Documents</div>
-          {files.length === 0 ? (
-            <p className="tree-empty">No documents yet</p>
-          ) : (
-            files.map((doc) => (
-              <Link
-                key={doc.id}
-                to="/upload"
-                className={`recent doc ${doc.status === 'error' ? 'doc-error' : ''}`}
-                title={doc.name}
-                onClick={closeMenu}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                  <path
-                    d="M6.5 3.5h7L18 8v12.5H6.5V3.5Z"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinejoin="round"
-                  />
-                  <path d="M13.2 3.6V8H18" stroke="currentColor" strokeWidth="1.6" />
-                </svg>
-                <span className="doc-name">{doc.name}</span>
-              </Link>
-            ))
-          )}
+          {activeTab === 'ask' ? (
+            <>
+              <div className="tree-label">Documents</div>
+              {files.length === 0 ? (
+                <p className="tree-empty">No documents yet</p>
+              ) : (
+                files.map((doc) => (
+                  <Link
+                    key={doc.id}
+                    to="/upload"
+                    className={`recent doc ${doc.status === 'error' ? 'doc-error' : ''}`}
+                    title={doc.name}
+                    onClick={closeMenu}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                      <path
+                        d="M6.5 3.5h7L18 8v12.5H6.5V3.5Z"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinejoin="round"
+                      />
+                      <path d="M13.2 3.6V8H18" stroke="currentColor" strokeWidth="1.6" />
+                    </svg>
+                    <span className="doc-name">{doc.name}</span>
+                  </Link>
+                ))
+              )}
 
-          <div className="tree-label">Earlier questions</div>
-          {filteredChats.length === 0 ? (
-            <p className="tree-empty">
-              {chats.length === 0 ? 'No questions yet' : 'Nothing matches your search'}
-            </p>
+              <div className="tree-label">Earlier questions</div>
+              {filteredChats.length === 0 ? (
+                <p className="tree-empty">
+                  {chats.length === 0 ? 'No questions yet' : 'Nothing matches your search'}
+                </p>
+              ) : (
+                filteredChats.map((chat) => (
+                  <Link
+                    key={chat.id}
+                    to={`/chat/${chat.id}`}
+                    className="recent"
+                    aria-current={chat.id === activeChatId}
+                    title={chat.title}
+                    onClick={closeMenu}
+                  >
+                    {chat.title}
+                  </Link>
+                ))
+              )}
+            </>
           ) : (
-            filteredChats.map((chat) => (
-              <Link
-                key={chat.id}
-                to={`/chat/${chat.id}`}
-                className="recent"
-                aria-current={chat.id === activeChatId}
-                title={chat.title}
-                onClick={closeMenu}
-              >
-                {chat.title}
-              </Link>
-            ))
+            <>
+              <div className="tree-label">Projects</div>
+              {isAddingProject ? (
+                <form
+                  className="recent project-new"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    submitNewProject()
+                  }}
+                >
+                  <input
+                    autoFocus
+                    value={newProjectName}
+                    onChange={(event) => setNewProjectName(event.target.value)}
+                    onBlur={submitNewProject}
+                    placeholder="Project name"
+                    aria-label="New project name"
+                  />
+                </form>
+              ) : (
+                <button type="button" className="recent project-add" onClick={() => setIsAddingProject(true)}>
+                  + New project
+                </button>
+              )}
+
+              {projects.length === 0 ? (
+                <p className="tree-empty">No projects yet</p>
+              ) : (
+                projects.map((project) => (
+                  <Link
+                    key={project.id}
+                    to={`/project/${project.id}`}
+                    className="recent"
+                    aria-current={project.id === activeProjectId}
+                    title={project.name}
+                    onClick={closeMenu}
+                  >
+                    {project.name}
+                  </Link>
+                ))
+              )}
+            </>
           )}
         </nav>
 

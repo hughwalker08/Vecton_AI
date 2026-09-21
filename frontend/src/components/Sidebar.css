@@ -81,6 +81,62 @@
   gap: 1px;
 }
 
+.nav-tabs {
+  display: flex;
+  gap: 2px;
+  margin-top: 14px;
+  padding: 3px;
+  background: var(--rule-soft, #f0ede7);
+  border-radius: 9px;
+}
+
+.nav-tab {
+  flex: 1;
+  border: none;
+  background: none;
+  padding: 6px 0;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted, #8d8880);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.nav-tab[aria-selected='true'] {
+  background: var(--paper, #fff);
+  color: var(--ink, #1b1a18);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.project-add {
+  border: 1px dashed var(--accent, #f05a22);
+  background: none;
+  font: inherit;
+  color: var(--accent, #f05a22);
+  font-weight: 600;
+  padding: 6px 9px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.project-add:hover {
+  background: var(--accent-soft, rgba(240, 90, 34, 0.1));
+}
+
+.project-add:hover {
+  color: var(--accent, #f05a22);
+}
+
+.project-new input {
+  width: 100%;
+  border: 1px solid var(--accent, #f05a22);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
 .nav-item {
   display: flex;
   align-items: center;

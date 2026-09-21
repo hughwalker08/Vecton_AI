@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar.jsx'
 import HomePage from './pages/HomePage.jsx'
 import ChatPage from './pages/ChatPage.jsx'
 import UploadPage from './pages/UploadPage.jsx'
+import ProjectPage from './pages/ProjectPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import OnboardingPage from './pages/OnboardingPage.jsx'
 import { supabase } from './lib/supabase.js'
@@ -19,8 +20,13 @@ export default function App() {
   const [chats, setChats] = useState([])
   const [uploadedFiles, setUploadedFiles] = useState([])
   const [folders, setFolders] = useState([])
+  const [projects, setProjects] = useState([])
 
-  function createChat(question, jurisdiction) {
+  // `projectId`, when given, tags the chat so ProjectPage's chat list picks
+  // it up -- see FolderBrowser.jsx's matching comment for why an unassigned
+  // chat/folder (projectId null) is a first-class, fully-supported state,
+  // not a migration gap.
+  function createChat(question, jurisdiction, projectId = null) {
     const id = crypto.randomUUID()
     const title = deriveChatTitle(question)
 
@@ -28,7 +34,23 @@ export default function App() {
     // ChatPage once the first message is sent (see its ensureConversation),
     // not here, so this id never gets orphaned by a row insert racing a
     // reload of the chats list below.
-    setChats((currentChats) => [{ id, title, jurisdiction }, ...currentChats])
+    setChats((currentChats) => [{ id, title, jurisdiction, projectId }, ...currentChats])
+
+    return id
+  }
+
+  function createProject(name) {
+    const trimmed = name.trim()
+    if (!trimmed) return null
+    const id = crypto.randomUUID()
+
+    setProjects((current) => [...current, { id, name: trimmed }])
+    supabase
+      .from('projects')
+      .insert({ id, user_id: session.user.id, name: trimmed })
+      .then(({ error }) => {
+        if (error) console.error(error)
+      })
 
     return id
   }
@@ -45,7 +67,7 @@ export default function App() {
 
       const { data, error } = await supabase
         .from('conversations')
-        .select('id, title, jurisdiction')
+        .select('id, title, jurisdiction, project_id')
         .order('updated_at', { ascending: false })
 
       if (error) {
@@ -53,10 +75,42 @@ export default function App() {
         return
       }
 
-      setChats(data ?? [])
+      setChats(
+        (data ?? []).map((row) => ({
+          id: row.id,
+          title: row.title,
+          jurisdiction: row.jurisdiction,
+          projectId: row.project_id,
+        })),
+      )
     }
 
     loadChats()
+  }, [session])
+
+  // Same reload-on-session pattern as loadChats/loadDocuments (see migration
+  // 0010): the optional project grouping above chats/folders.
+  useEffect(() => {
+    async function loadProjects() {
+      if (!session?.user?.id) {
+        setProjects([])
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name')
+        .order('created_at', { ascending: true })
+
+      if (error) {
+        console.error(error)
+        return
+      }
+
+      setProjects(data ?? [])
+    }
+
+    loadProjects()
   }, [session])
 
   // Same reload-on-session pattern as loadChats above (see migration 0009):
@@ -71,21 +125,28 @@ export default function App() {
       }
 
       const [foldersResult, documentsResult] = await Promise.all([
-        supabase.from('folders').select('id, name').order('created_at', { ascending: true }),
+        supabase.from('folders').select('id, name, project_id').order('created_at', { ascending: true }),
         supabase
           .from('documents')
-          .select('id, folder_id, name, size, status, detail, text, created_at')
+          .select('id, folder_id, project_id, name, size, status, detail, text, created_at')
           .order('created_at', { ascending: false }),
       ])
 
       if (foldersResult.error) console.error(foldersResult.error)
       if (documentsResult.error) console.error(documentsResult.error)
 
-      setFolders(foldersResult.data ?? [])
+      setFolders(
+        (foldersResult.data ?? []).map((row) => ({
+          id: row.id,
+          name: row.name,
+          projectId: row.project_id,
+        })),
+      )
       setUploadedFiles(
         (documentsResult.data ?? []).map((row) => ({
           id: row.id,
           folderId: row.folder_id,
+          projectId: row.project_id,
           name: row.name,
           size: row.size,
           status: row.status,
@@ -176,13 +237,29 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="app-shell">
-        <Sidebar chats={chats} files={uploadedFiles} userEmail={session.user?.email} />
+        <Sidebar
+          chats={chats}
+          files={uploadedFiles}
+          projects={projects}
+          onCreateProject={createProject}
+          userEmail={session.user?.email}
+        />
 
         <div className="app-main">
           <Routes>
             <Route
               path="/"
-              element={<HomePage onStartChat={createChat} defaultJurisdiction={profile.jurisdiction} />}
+              element={
+                <HomePage
+                  onStartChat={createChat}
+                  defaultJurisdiction={profile.jurisdiction}
+                  userName={
+                    session.user.user_metadata?.full_name ||
+                    session.user.user_metadata?.name ||
+                    session.user.email?.split('@')[0]
+                  }
+                />
+              }
             />
             <Route
 		path="/chat/:chatId"
@@ -203,6 +280,23 @@ export default function App() {
                   folders={folders}
                   setFolders={setFolders}
                   jurisdiction={profile.jurisdiction}
+                  userId={session.user.id}
+                />
+              }
+            />
+            <Route
+              path="/project/:projectId"
+              element={
+                <ProjectPage
+                  projects={projects}
+                  setProjects={setProjects}
+                  chats={chats}
+                  onStartChat={createChat}
+                  files={uploadedFiles}
+                  setFiles={setUploadedFiles}
+                  folders={folders}
+                  setFolders={setFolders}
+                  defaultJurisdiction={profile.jurisdiction}
                   userId={session.user.id}
                 />
               }

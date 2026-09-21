@@ -33,10 +33,11 @@ function mockSignedOut() {
 // Routes by table name so this one mock covers the user_profiles lookup
 // (App.jsx's loadProfile) as well as the conversations/messages calls that
 // fire once inside the real ChatPage a "start a chat" test navigates into
-// (see ChatPage.jsx's ensureConversation/saveMessage/history-load), and the
+// (see ChatPage.jsx's ensureConversation/saveMessage/history-load), the
 // folders/documents calls App.jsx's loadDocuments and the real UploadPage
-// fire (see migration 0009) -- none of these tests seed prior chat/document
-// history, so every read here always resolves empty.
+// fire (see migration 0009), and projects (App.jsx's loadProjects, migration
+// 0010) -- none of these tests seed prior chat/document/project history, so
+// every read here always resolves empty.
 function mockSignedIn({ jurisdiction = 'NSW', email = 'jordan@example.com' } = {}) {
   supabase.auth.getSession.mockResolvedValue({
     data: { session: { user: { id: 'user-1', email } } },
@@ -78,6 +79,14 @@ function mockSignedIn({ jurisdiction = 'NSW', email = 'jordan@example.com' } = {
       }
     }
     if (table === 'documents') {
+      return {
+        select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        insert: () => Promise.resolve({ error: null }),
+        update: () => ({ eq: () => Promise.resolve({ error: null }) }),
+        delete: () => ({ eq: () => Promise.resolve({ error: null }) }),
+      }
+    }
+    if (table === 'projects') {
       return {
         select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
         insert: () => Promise.resolve({ error: null }),

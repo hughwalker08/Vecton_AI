@@ -151,4 +151,46 @@ describe('Sidebar', () => {
 
     expect(screen.getByRole('link', { name: /upload documents/i })).toHaveAttribute('aria-current', 'true')
   })
+
+  it('shows the Ask tab content by default, with Projects hidden', () => {
+    renderSidebar({ chats: [{ id: 'abc', title: 'Ceiling height in bedrooms' }] })
+
+    expect(screen.getByText('Ceiling height in bedrooms')).toBeInTheDocument()
+    expect(screen.queryByText('No projects yet')).not.toBeInTheDocument()
+  })
+
+  it('switches to the Projects tab and shows "No projects yet" when there are none', () => {
+    renderSidebar({ projects: [] })
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Projects' }))
+
+    expect(screen.getByText('No projects yet')).toBeInTheDocument()
+    expect(screen.queryByText('Earlier questions')).not.toBeInTheDocument()
+  })
+
+  it('lists each project as a link to its project page', () => {
+    renderSidebar({
+      projects: [
+        { id: 'p1', name: 'Wattle Court build' },
+        { id: 'p2', name: '14 Acacia Ave' },
+      ],
+    })
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Projects' }))
+
+    expect(screen.getByRole('link', { name: 'Wattle Court build' })).toHaveAttribute('href', '/project/p1')
+    expect(screen.getByRole('link', { name: '14 Acacia Ave' })).toHaveAttribute('href', '/project/p2')
+  })
+
+  it('creates a project via the "+ New project" control', () => {
+    const onCreateProject = vi.fn().mockReturnValue('new-id')
+    renderSidebar({ projects: [], onCreateProject })
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Projects' }))
+    fireEvent.click(screen.getByRole('button', { name: '+ New project' }))
+    fireEvent.change(screen.getByLabelText('New project name'), { target: { value: 'Wattle Court build' } })
+    fireEvent.submit(screen.getByLabelText('New project name').closest('form'))
+
+    expect(onCreateProject).toHaveBeenCalledWith('Wattle Court build')
+  })
 })

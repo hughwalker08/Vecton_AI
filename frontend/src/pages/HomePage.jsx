@@ -18,7 +18,7 @@ function getGreeting() {
   return 'Good evening'
 }
 
-export default function HomePage({ onStartChat, defaultJurisdiction }) {
+export default function HomePage({ onStartChat, defaultJurisdiction, userName }) {
   const [question, setQuestion] = useState('')
   const [jurisdiction, setJurisdiction] = useState(defaultJurisdiction || '')
   const navigate = useNavigate()
@@ -69,7 +69,10 @@ export default function HomePage({ onStartChat, defaultJurisdiction }) {
 
       <div className="home">
         <div className="orb" aria-hidden="true" />
-        <h1 className="greet">{getGreeting()}</h1>
+        <h1 className="greet">
+          {getGreeting()}
+          {userName ? `, ${userName}` : ''}
+        </h1>
         <p className="greet-sub">
           Ask about a clause, a consent condition, or anything in your project documents.
         </p>
