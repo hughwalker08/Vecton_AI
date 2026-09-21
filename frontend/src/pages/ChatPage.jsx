@@ -4,6 +4,7 @@ import { askQuestion } from '../api/client.js'
 import { useAttachment } from '../hooks/useAttachment.js'
 import { supabase } from '../lib/supabase.js'
 import { deriveChatTitle } from '../lib/chatTitle.js'
+import { renderMarkdownLite } from '../lib/markdownLite.jsx'
 import SourcePanel from '../components/SourcePanel.jsx'
 import './ChatPage.css'
 
@@ -333,7 +334,7 @@ export default function ChatPage({ chats = [], defaultJurisdiction, userId }) {
             ) : (
               <div className="answer-block" key={message.id}>
                 <div className={`answer ${message.isError ? 'answer-error' : ''}`}>
-                  <p>{message.text}</p>
+                  {renderMarkdownLite(message.text)}
                 </div>
 
                 {message.abstained && !message.isError && (

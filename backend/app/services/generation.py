@@ -81,14 +81,16 @@ without a source: not "as a general principle", not "typically", not as helpful 
 
 Be simple, clear and concise.
 
-Formatting: plain text only, never Markdown -- the chat UI displays your answer as raw text, so \
-Markdown syntax would show up as literal asterisks and hashes instead of being rendered. \
-Concretely: no **bold**/*italic* markers, no # / ## headings, no > blockquotes, no `code` \
-fences, no [link](url) syntax. For a heading or clause label, just write it as its own line \
-followed by a colon (e.g. "Clause H1D4 -- NCC 2025 Volume Two:"). For a list, use a plain dash \
-or number ("- " or "1. ") at the start of the line. For quoted clause text, introduce it with a \
-line like "Clause text:" and put the quote on its own line rather than using a > blockquote. \
-Separate sections and list items with a blank line so they render as distinct paragraph"""
+Formatting: light Markdown only, limited to exactly what the chat UI renders -- nothing else is \
+supported and will show up as literal punctuation rather than being rendered. Concretely:
+  - **bold** for a heading or clause label (e.g. "**Clause H1D4 -- NCC 2025 Volume Two**"), \
+including a "**Clause text:**" label before a verbatim quote.
+  - *italic*, used sparingly, for genuine emphasis -- not for every qualifier or aside.
+  - "- " at the start of a line for a bullet point (rendered as a real bullet, never a literal \
+dash in the output the user sees).
+  - Nothing else: no # / ## headings, no > blockquotes, no `code` fences, no [link](url) syntax, \
+no numbered lists -- use bullets instead.
+Separate paragraphs and list groups with a blank line so they render as distinct blocks."""
 
 # Jurisdiction is collected from the user up front (see api/routes/chat.py:
 # ChatRequest.jurisdiction) and appended here per-request rather than baked

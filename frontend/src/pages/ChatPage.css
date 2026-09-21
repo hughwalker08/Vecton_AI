@@ -50,9 +50,35 @@
   color: var(--ink-2, #4b4741);
 }
 
-.answer p {
-  margin: 0;
-  white-space: pre-wrap;
+.answer p,
+.answer ul {
+  margin: 0 0 14px;
+}
+
+.answer p:last-child,
+.answer ul:last-child {
+  margin-bottom: 0;
+}
+
+.answer ul {
+  padding-left: 1.3em;
+}
+
+.answer li {
+  margin-bottom: 4px;
+}
+
+.answer li:last-child {
+  margin-bottom: 0;
+}
+
+.answer strong {
+  font-weight: 700;
+  color: var(--ink, #1b1a18);
+}
+
+.answer em {
+  font-style: italic;
 }
 
 .answer-error {
