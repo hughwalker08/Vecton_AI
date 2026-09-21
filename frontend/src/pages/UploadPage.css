@@ -91,87 +91,170 @@
   outline-offset: 2px;
 }
 
-.folder-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+/* Folder list: a row per folder, in the same file-manager idiom as .item
+   below (icon + name/subtitle, hover background, thin separator) rather than
+   a filter-tab bar -- clicking a row drills into that folder. */
+.folder-list {
   margin-top: 22px;
 }
 
-.folder-pill {
-  border: 1px solid var(--rule, #e6e3dd);
-  background: none;
-  color: var(--ink-2, #4b4741);
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+.folder-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  border-radius: 10px;
+  border-bottom: 1px solid var(--rule-soft, #f0ede7);
+  transition: background 0.12s;
 }
 
-.folder-pill:hover {
+.folder-row:hover {
   background: var(--hover, #f4f2ee);
 }
 
-.folder-pill[aria-pressed='true'] {
-  background: var(--accent, #f05a22);
-  border-color: var(--accent, #f05a22);
-  color: #fff;
-}
-
-.folder-pill-wrap {
-  display: inline-flex;
+.folder-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 13px;
+  padding: 13px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
 }
 
-.folder-pill-actions {
-  display: inline-flex;
+.folder-row-ico {
+  flex: none;
+  color: var(--accent, #f05a22);
+  opacity: 0.8;
+}
+
+.folder-row-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.folder-row-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-row-count {
+  font-size: 12px;
+  color: var(--muted, #8d8880);
+  margin-top: 2px;
+}
+
+.folder-row-actions {
+  flex: none;
+  display: flex;
   gap: 2px;
+  padding-right: 12px;
 }
 
-.folder-pill-actions button {
+.folder-row-actions button {
   border: none;
   background: none;
   color: var(--muted, #8d8880);
-  padding: 5px;
-  border-radius: 6px;
+  padding: 6px;
+  border-radius: 7px;
   cursor: pointer;
   display: inline-flex;
+  transition: background 0.12s, color 0.12s;
 }
 
-.folder-pill-actions button:hover {
+.folder-row-actions button:hover {
   background: var(--rule-soft, #f0ede7);
   color: var(--ink, #1b1a18);
 }
 
-.folder-add {
-  border: 1px dashed var(--rule, #e6e3dd);
+.folder-row-add {
+  color: var(--muted, #8d8880);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 13px 12px;
+  cursor: pointer;
+}
+
+.folder-row-add:hover {
+  color: var(--accent, #f05a22);
+  background: var(--hover, #f4f2ee);
+}
+
+.folder-row-add svg {
+  margin-right: 10px;
+  vertical-align: -2px;
+}
+
+.folder-row-input {
+  flex: 1;
+  border: 1px solid var(--accent, #f05a22);
+  border-radius: 8px;
+  padding: 7px 10px;
+  margin: 8px 12px 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Inside a folder: a back link + the folder's name, replacing the row list. */
+.folder-current {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 22px 0 4px;
+}
+
+.folder-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: none;
   background: none;
   color: var(--muted, #8d8880);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 600;
-  padding: 6px 12px;
-  border-radius: 999px;
+  padding: 6px 4px;
   cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
 }
 
-.folder-add:hover {
-  border-color: var(--accent, #f05a22);
-  color: var(--accent, #f05a22);
+.folder-back:hover {
+  color: var(--ink, #1b1a18);
 }
 
-.folder-new input,
-.folder-rename input {
-  border: 1px solid var(--accent, #f05a22);
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12.5px;
+.folder-current-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 15px;
   font-weight: 600;
-  width: 140px;
+}
+
+.folder-current-name button {
+  border: none;
+  background: none;
+  color: var(--muted, #8d8880);
+  padding: 6px;
+  border-radius: 7px;
+  cursor: pointer;
+  display: inline-flex;
+}
+
+.folder-current-name button:hover {
+  background: var(--rule-soft, #f0ede7);
+  color: var(--ink, #1b1a18);
+}
+
+.folder-current-rename .folder-row-input {
+  margin: 0;
 }
 
 .item-folder {

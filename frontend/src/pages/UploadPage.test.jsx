@@ -56,7 +56,7 @@ describe('UploadPage', () => {
     renderUploadPage([])
 
     expect(screen.getByText('No documents uploaded yet')).toBeInTheDocument()
-    expect(screen.getByText('0')).toBeInTheDocument()
+    expect(screen.getAllByText('0')).toHaveLength(2) // 0 files, 0 folders
   })
 
   it('adds a dropped file to the list immediately as "uploading"', () => {
@@ -196,10 +196,10 @@ describe('UploadPage', () => {
     expect(screen.getByLabelText('Document text')).toHaveValue('Manually typed text.')
   })
 
-  it('creates a folder via the "+ New folder" control', () => {
+  it('creates a folder via the "New folder" row', () => {
     const { setFolders } = renderUploadPage([])
 
-    fireEvent.click(screen.getByRole('button', { name: '+ New folder' }))
+    fireEvent.click(screen.getByRole('button', { name: 'New folder' }))
     fireEvent.change(screen.getByLabelText('New folder name'), { target: { value: 'Site plans' } })
     fireEvent.submit(screen.getByLabelText('New folder name').closest('form'))
 
@@ -221,7 +221,7 @@ describe('UploadPage', () => {
     expect(applyUpdater(initial, setFiles)[0].folderId).toBe('f1')
   })
 
-  it('filtering by a folder shows only that folder\'s documents', () => {
+  it('the root view lists folders as rows (with a file count) and unfiled files separately', () => {
     renderUploadPage(
       [
         { id: 1, name: 'plan.pdf', size: 1024, uploadedAt: new Date(), status: 'done', detail: 'ok', folderId: 'f1' },
@@ -230,8 +230,25 @@ describe('UploadPage', () => {
       { folders: [{ id: 'f1', name: 'Site plans' }] },
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Site plans' }))
+    expect(screen.getByRole('button', { name: /site plans.*1 file/i })).toBeInTheDocument()
 
+    const list = document.querySelector('.list')
+    expect(within(list).getByText('report.pdf')).toBeInTheDocument()
+    expect(within(list).queryByText('plan.pdf')).not.toBeInTheDocument()
+  })
+
+  it('clicking a folder row drills into it, showing only its documents', () => {
+    renderUploadPage(
+      [
+        { id: 1, name: 'plan.pdf', size: 1024, uploadedAt: new Date(), status: 'done', detail: 'ok', folderId: 'f1' },
+        { id: 2, name: 'report.pdf', size: 1024, uploadedAt: new Date(), status: 'done', detail: 'ok', folderId: null },
+      ],
+      { folders: [{ id: 'f1', name: 'Site plans' }] },
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /^site plans/i }))
+
+    expect(screen.getByRole('button', { name: 'All files' })).toBeInTheDocument()
     const list = document.querySelector('.list')
     expect(within(list).getByText('plan.pdf')).toBeInTheDocument()
     expect(within(list).queryByText('report.pdf')).not.toBeInTheDocument()
@@ -244,7 +261,7 @@ describe('UploadPage', () => {
     const initialFolders = [{ id: 'f1', name: 'Site plans' }]
     const { setFiles, setFolders } = renderUploadPage(initialFiles, { folders: initialFolders })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Site plans' })) // select it to reveal its actions
+    // Delete/rename are always-visible row actions now, no need to drill in first.
     fireEvent.click(screen.getByRole('button', { name: 'Delete Site plans' }))
 
     expect(applyUpdater(initialFolders, setFolders)).toHaveLength(0)

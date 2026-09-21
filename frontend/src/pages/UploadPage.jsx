@@ -37,6 +37,59 @@ function formatDate(date) {
   })
 }
 
+// Small inline icons shared by the folder list/current-folder header below --
+// kept tiny and un-styled beyond size so they inherit color from whatever
+// button wraps them.
+function FolderIcon() {
+  return (
+    <svg className="folder-row-ico" width="17" height="17" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M3.5 7.5A1.5 1.5 0 0 1 5 6h4l1.8 2H19a1.5 1.5 0 0 1 1.5 1.5v8A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5v-10Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M4 20l1-4L16 5l3 3L8 19l-4 1Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function XIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+      <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function PlusIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function BackIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+      <path d="M14.5 5.5 8 12l6.5 6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 function FindingCard({ finding, query, onViewSource }) {
   const [flagOpen, setFlagOpen] = useState(false)
   const [corrected, setCorrected] = useState('')
@@ -396,7 +449,7 @@ function ComplianceCheck({ jurisdiction, files, folders = [] }) {
 
 export default function UploadPage({ files, setFiles, folders = [], setFolders, jurisdiction, userId }) {
   const [isDragging, setIsDragging] = useState(false)
-  // '' = All, 'unfiled' = no folder, else a folders.id.
+  // '' = root (folders + unfiled files), else a folders.id you've drilled into.
   const [activeFolderId, setActiveFolderId] = useState('')
   const [isAddingFolder, setIsAddingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
@@ -412,10 +465,9 @@ export default function UploadPage({ files, setFiles, folders = [], setFolders, 
     const incoming = Array.from(fileList || [])
     if (incoming.length === 0) return
 
-    // A new file lands in the folder currently being viewed (Unfiled/All both
-    // mean "no folder" here -- there's no meaningful folder to assign from
-    // the All view either).
-    const folderId = activeFolderId && activeFolderId !== 'unfiled' ? activeFolderId : null
+    // A new file lands in whichever folder is currently open -- root (no
+    // folder open) means "no folder", same as an unfiled file.
+    const folderId = activeFolderId || null
 
     const records = incoming.map((file) => ({
       id: crypto.randomUUID(),
@@ -516,11 +568,13 @@ export default function UploadPage({ files, setFiles, folders = [], setFolders, 
     supabase.from('folders').delete().eq('id', id).then(logIfError)
   }
 
-  const visibleFiles = files.filter((f) => {
-    if (activeFolderId === '') return true
-    if (activeFolderId === 'unfiled') return !f.folderId
-    return f.folderId === activeFolderId
-  })
+  // Root shows folders (as rows) plus whatever isn't filed into one; drilling
+  // into a folder narrows this to just its own files -- see the folder-list
+  // vs. folder-current split in the render below.
+  const visibleFiles = files.filter((f) =>
+    activeFolderId === '' ? !f.folderId : f.folderId === activeFolderId,
+  )
+  const currentFolder = folders.find((f) => f.id === activeFolderId)
 
   return (
     <main className="upload-page">
@@ -534,59 +588,50 @@ export default function UploadPage({ files, setFiles, folders = [], setFolders, 
           <div className="counts">
             <div className="count">
               <b>{files.length}</b>
-              <span>document{files.length === 1 ? '' : 's'}</span>
+              <span>file{files.length === 1 ? '' : 's'}</span>
+            </div>
+            <div className="count">
+              <b>{folders.length}</b>
+              <span>folder{folders.length === 1 ? '' : 's'}</span>
             </div>
           </div>
         </div>
 
-        <div className="folder-bar" role="tablist" aria-label="Filter documents by folder">
-          <button
-            type="button"
-            className="folder-pill"
-            aria-pressed={activeFolderId === ''}
-            onClick={() => setActiveFolderId('')}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            className="folder-pill"
-            aria-pressed={activeFolderId === 'unfiled'}
-            onClick={() => setActiveFolderId('unfiled')}
-          >
-            Unfiled
-          </button>
-
-          {folders.map((folder) =>
-            renamingFolderId === folder.id ? (
-              <form
-                key={folder.id}
-                className="folder-rename"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  renameFolder(folder.id)
-                }}
-              >
-                <input
-                  autoFocus
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  onBlur={() => renameFolder(folder.id)}
-                  aria-label={`Rename folder ${folder.name}`}
-                />
-              </form>
-            ) : (
-              <span className="folder-pill-wrap" key={folder.id}>
-                <button
-                  type="button"
-                  className="folder-pill"
-                  aria-pressed={activeFolderId === folder.id}
-                  onClick={() => setActiveFolderId(folder.id)}
+        {activeFolderId === '' ? (
+          <div className="folder-list">
+            {folders.map((folder) => {
+              const count = files.filter((f) => f.folderId === folder.id).length
+              return renamingFolderId === folder.id ? (
+                <form
+                  key={folder.id}
+                  className="folder-row"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    renameFolder(folder.id)
+                  }}
                 >
-                  {folder.name}
-                </button>
-                {activeFolderId === folder.id && (
-                  <span className="folder-pill-actions">
+                  <FolderIcon />
+                  <input
+                    autoFocus
+                    className="folder-row-input"
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={() => renameFolder(folder.id)}
+                    aria-label={`Rename folder ${folder.name}`}
+                  />
+                </form>
+              ) : (
+                <div className="folder-row" key={folder.id}>
+                  <button type="button" className="folder-row-main" onClick={() => setActiveFolderId(folder.id)}>
+                    <FolderIcon />
+                    <span className="folder-row-body">
+                      <span className="folder-row-name">{folder.name}</span>
+                      <span className="folder-row-count">
+                        {count} file{count === 1 ? '' : 's'}
+                      </span>
+                    </span>
+                  </button>
+                  <span className="folder-row-actions">
                     <button
                       type="button"
                       aria-label={`Rename ${folder.name}`}
@@ -595,53 +640,94 @@ export default function UploadPage({ files, setFiles, folders = [], setFolders, 
                         setRenameValue(folder.name)
                       }}
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                        <path
-                          d="M4 20l1-4L16 5l3 3L8 19l-4 1Z"
-                          stroke="currentColor"
-                          strokeWidth="1.8"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
+                      <PencilIcon />
                     </button>
                     <button
                       type="button"
                       aria-label={`Delete ${folder.name}`}
                       onClick={() => deleteFolder(folder.id)}
                     >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
-                        <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                      </svg>
+                      <XIcon />
                     </button>
                   </span>
-                )}
-              </span>
-            ),
-          )}
+                </div>
+              )
+            })}
 
-          {isAddingFolder ? (
-            <form
-              className="folder-new"
-              onSubmit={(e) => {
-                e.preventDefault()
-                addFolder()
-              }}
-            >
-              <input
-                autoFocus
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                onBlur={() => (newFolderName.trim() ? addFolder() : setIsAddingFolder(false))}
-                placeholder="Folder name"
-                aria-label="New folder name"
-              />
-            </form>
-          ) : (
-            <button type="button" className="folder-add" onClick={() => setIsAddingFolder(true)}>
-              + New folder
+            {isAddingFolder ? (
+              <form
+                className="folder-row"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  addFolder()
+                }}
+              >
+                <FolderIcon />
+                <input
+                  autoFocus
+                  className="folder-row-input"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onBlur={() => (newFolderName.trim() ? addFolder() : setIsAddingFolder(false))}
+                  placeholder="Folder name"
+                  aria-label="New folder name"
+                />
+              </form>
+            ) : (
+              <button type="button" className="folder-row folder-row-add" onClick={() => setIsAddingFolder(true)}>
+                <PlusIcon />
+                New folder
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="folder-current">
+            <button type="button" className="folder-back" onClick={() => setActiveFolderId('')}>
+              <BackIcon />
+              All files
             </button>
-          )}
-        </div>
+
+            {renamingFolderId === activeFolderId ? (
+              <form
+                className="folder-row folder-current-rename"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  renameFolder(activeFolderId)
+                }}
+              >
+                <input
+                  autoFocus
+                  className="folder-row-input"
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={() => renameFolder(activeFolderId)}
+                  aria-label={`Rename folder ${currentFolder?.name}`}
+                />
+              </form>
+            ) : (
+              <span className="folder-current-name">
+                {currentFolder?.name}
+                <button
+                  type="button"
+                  aria-label={`Rename ${currentFolder?.name}`}
+                  onClick={() => {
+                    setRenamingFolderId(activeFolderId)
+                    setRenameValue(currentFolder?.name || '')
+                  }}
+                >
+                  <PencilIcon />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete ${currentFolder?.name}`}
+                  onClick={() => deleteFolder(activeFolderId)}
+                >
+                  <XIcon />
+                </button>
+              </span>
+            )}
+          </div>
+        )}
 
         <div
           className={`dropzone ${isDragging ? 'over' : ''}`}
@@ -689,11 +775,17 @@ export default function UploadPage({ files, setFiles, folders = [], setFolders, 
         <div className="list">
           {visibleFiles.length === 0 ? (
             <div className="empty">
-              <p>{files.length === 0 ? 'No documents uploaded yet' : 'No documents in this folder'}</p>
+              <p>
+                {activeFolderId === ''
+                  ? files.length === 0
+                    ? 'No documents uploaded yet'
+                    : 'No unfiled documents'
+                  : 'No documents in this folder'}
+              </p>
               <span>
-                {files.length === 0
-                  ? 'Files you upload will show up here.'
-                  : 'Upload a document while this folder is selected, or move one in.'}
+                {activeFolderId === ''
+                  ? 'Files without a folder will show up here.'
+                  : 'Upload a document while viewing this folder, or move one in.'}
               </span>
             </div>
           ) : (
