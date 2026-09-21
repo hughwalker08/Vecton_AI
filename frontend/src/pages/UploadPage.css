@@ -95,6 +95,9 @@
    below (icon + name/subtitle, hover background, thin separator) rather than
    a filter-tab bar -- clicking a row drills into that folder. */
 .folder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin: 22px 0 26px;
 }
 
@@ -104,12 +107,12 @@
   align-items: center;
   gap: 13px;
   border-radius: 10px;
-  border-bottom: 1px solid var(--rule-soft, #f0ede7);
+  background: var(--rule-soft, #f0ede7);
   transition: background 0.12s;
 }
 
 .folder-row:hover {
-  background: var(--hover, #f4f2ee);
+  background: var(--rule, #e6e3dd);
 }
 
 .folder-row-main {

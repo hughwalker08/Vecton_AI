@@ -591,6 +591,32 @@ export default function UploadPage({ files, setFiles, folders = [], setFolders, 
 
         {activeFolderId === '' ? (
           <div className="folder-list">
+            {isAddingFolder ? (
+              <form
+                className="folder-row"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  addFolder()
+                }}
+              >
+                <FolderIcon />
+                <input
+                  autoFocus
+                  className="folder-row-input"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onBlur={() => (newFolderName.trim() ? addFolder() : setIsAddingFolder(false))}
+                  placeholder="Folder name"
+                  aria-label="New folder name"
+                />
+              </form>
+            ) : (
+              <button type="button" className="folder-row folder-row-add" onClick={() => setIsAddingFolder(true)}>
+                <FolderIcon />
+                New folder
+              </button>
+            )}
+
             {folders.map((folder) => {
               const count = files.filter((f) => f.folderId === folder.id).length
               return renamingFolderId === folder.id ? (
@@ -645,32 +671,6 @@ export default function UploadPage({ files, setFiles, folders = [], setFolders, 
                 </div>
               )
             })}
-
-            {isAddingFolder ? (
-              <form
-                className="folder-row"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  addFolder()
-                }}
-              >
-                <FolderIcon />
-                <input
-                  autoFocus
-                  className="folder-row-input"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  onBlur={() => (newFolderName.trim() ? addFolder() : setIsAddingFolder(false))}
-                  placeholder="Folder name"
-                  aria-label="New folder name"
-                />
-              </form>
-            ) : (
-              <button type="button" className="folder-row folder-row-add" onClick={() => setIsAddingFolder(true)}>
-                <FolderIcon />
-                New folder
-              </button>
-            )}
           </div>
         ) : (
           <div className="folder-current">
