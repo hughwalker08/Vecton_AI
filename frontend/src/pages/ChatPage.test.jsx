@@ -8,7 +8,18 @@ vi.mock('../api/client.js', () => ({
   uploadDocument: vi.fn(),
 }))
 
+// ChatPage.jsx talks to Supabase directly for chat history (see
+// lib/chats.js) -- the real lib/supabase.js throws at import time without
+// VITE_SUPABASE_URL/VITE_SUPABASE_PUBLISHABLE_KEY set, which CI never sets
+// for the frontend job, so this has to be mocked rather than left to hit
+// the real module.
+vi.mock('../lib/chats.js', () => ({
+  loadChatMessages: vi.fn(),
+  saveMessage: vi.fn(),
+}))
+
 import { askQuestion, uploadDocument } from '../api/client.js'
+import { loadChatMessages, saveMessage } from '../lib/chats.js'
 
 function renderChatPage({ jurisdiction = 'NSW', route = '/chat/abc', state } = {}) {
   return render(
@@ -28,6 +39,13 @@ function renderChatPage({ jurisdiction = 'NSW', route = '/chat/abc', state } = {
 beforeEach(() => {
   askQuestion.mockReset()
   uploadDocument.mockReset()
+  // Default: an existing-chat-with-no-history / a chat route.state doesn't
+  // carry initialQuestion for falls into the "load persisted history"
+  // branch of the auto-send effect on every mount unless a test says
+  // otherwise -- see ChatPage.jsx. Resolving empty matches these tests'
+  // existing expectation of starting from a blank chat.
+  loadChatMessages.mockReset().mockResolvedValue([])
+  saveMessage.mockReset().mockResolvedValue()
 })
 
 describe('ChatPage', () => {
@@ -277,6 +295,59 @@ describe('ChatPage', () => {
     await waitFor(() =>
       expect(askQuestion).toHaveBeenCalledWith('Q1', 'NSW', { history: [], attachment: null }),
     )
+  })
+
+  it('loads a reopened chat\'s persisted history instead of starting blank', async () => {
+    loadChatMessages.mockResolvedValue([
+      { id: 'm1', role: 'user', text: 'What ceiling height do we need?', citations: null, abstained: false },
+      {
+        id: 'm2',
+        role: 'assistant',
+        text: 'Minimum 2.4m per H1D4.',
+        citations: [{ clause_id: 'H1D4', doc: 'NCC 2025 Volume Two' }],
+        abstained: false,
+      },
+    ])
+
+    // No route state -- an existing chat opened from the sidebar (or a
+    // direct/reloaded URL) never carries initialQuestion, unlike a chat
+    // just started from the home page.
+    renderChatPage({ route: '/chat/abc', state: undefined })
+
+    expect(loadChatMessages).toHaveBeenCalledWith('abc')
+    expect(await screen.findByText('What ceiling height do we need?')).toBeInTheDocument()
+    expect(await screen.findByText('Minimum 2.4m per H1D4.')).toBeInTheDocument()
+    // Loaded straight from storage -- never auto-sent to the backend again.
+    expect(askQuestion).not.toHaveBeenCalled()
+  })
+
+  it('saves the question and the answer after a real turn, but not a failed request', async () => {
+    askQuestion.mockResolvedValueOnce({ answer: 'An answer.', citations: [{ clause_id: 'H1D4' }], abstained: false })
+    renderChatPage()
+    const field = screen.getByLabelText('Construction compliance question')
+
+    fireEvent.change(field, { target: { value: 'Q1' } })
+    fireEvent.submit(field.closest('form'))
+    expect(await screen.findByText('An answer.')).toBeInTheDocument()
+
+    expect(saveMessage).toHaveBeenCalledWith('abc', { role: 'user', text: 'Q1' })
+    expect(saveMessage).toHaveBeenCalledWith('abc', {
+      role: 'assistant',
+      text: 'An answer.',
+      citations: [{ clause_id: 'H1D4' }],
+      abstained: false,
+    })
+
+    saveMessage.mockClear()
+    askQuestion.mockRejectedValueOnce(new Error('Quota exceeded.'))
+    fireEvent.change(field, { target: { value: 'Q2' } })
+    fireEvent.submit(field.closest('form'))
+    expect(await screen.findByText('Quota exceeded.')).toBeInTheDocument()
+
+    // The question is still saved -- only the failed reply's error bubble
+    // isn't, since it's a UI-only notice, not a real assistant turn.
+    expect(saveMessage).toHaveBeenCalledWith('abc', { role: 'user', text: 'Q2' })
+    expect(saveMessage).not.toHaveBeenCalledWith('abc', expect.objectContaining({ role: 'assistant' }))
   })
 
   it('disables the send button while a question is empty or blank', () => {

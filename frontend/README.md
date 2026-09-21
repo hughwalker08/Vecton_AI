@@ -41,10 +41,15 @@ Uses Vitest + React Testing Library, jsdom environment (config in
 src/
   main.jsx                # React entry point
   App.jsx                 # auth gate (Supabase session -> onboarding -> app
-                           # shell) + router; owns the in-memory chats/files lists
+                           # shell) + router; owns the chats list (persisted,
+                           # see lib/chats.js) and the still-in-memory-only
+                           # uploaded-files list
   theme.css                # design tokens (--paper, --ink, --accent, etc.)
   lib/
     supabase.js             # Supabase client (VITE_SUPABASE_URL/PUBLISHABLE_KEY)
+    chats.js                  # chat history CRUD, direct to Supabase (RLS-secured,
+                               # not routed through the backend -- see its own
+                               # header comment for why)
     jurisdictions.js          # AUSTRALIAN_JURISDICTIONS (ACT/NSW/NT/QLD/SA/TAS/VIC/WA)
   api/
     client.js                 # askQuestion() / uploadDocument() -- throws with
@@ -108,12 +113,19 @@ built on this side yet (see below).
   sign-off pending), so there's nothing to auto-fill the compliance check's
   document text field with, beyond the image transcription results
   `/api/upload` already returns.
-- **Chat history is per-session only, not persisted.** `/api/chat` is
-  multi-turn -- the frontend resends up to the last 6 messages of the
-  current chat as `history` on each question (see `api/client.js`,
-  `pages/ChatPage.jsx`), and the backend folds them into the model's
-  context (see `backend/app/services/generation.py`). What's still missing
-  is durability: the sidebar's chat list (`App.jsx`'s `chats` state) is
-  plain in-memory React state, populated only for chats started in this
-  session -- it resets on page refresh and nothing is saved server-side, so
-  there's no way to revisit a chat from a previous visit.
+- **Chat memory (within a chat) vs. chat history (across chats) are two
+  different things, both implemented now, for different reasons.**
+  `/api/chat` is multi-turn -- the frontend resends up to the last 6
+  messages of the *current* chat as `history` on each question (see
+  `api/client.js`, `pages/ChatPage.jsx`), and the backend folds them into
+  the model's context (see `backend/app/services/generation.py`). Separately,
+  the chat itself -- the sidebar list and every message in it -- is now
+  persisted directly to Supabase (`lib/chats.js`, `backend/migrations/
+  versions/0007_chat_history.py`), secured with Row Level Security rather
+  than routed through the backend, since the backend has no per-user auth
+  wired in (see `0006_compliance_feedback.py`'s docstring). So: reopening a
+  chat from a previous visit, or on another device, shows its real history;
+  what's *not* persisted is the extra polish around that (e.g. no chat
+  deletion or renaming yet, no updated-at bump to float a chat back to the
+  top of the sidebar when it's used again -- it's ordered by when it was
+  started).

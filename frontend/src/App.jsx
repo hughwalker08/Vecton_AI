@@ -7,6 +7,7 @@ import UploadPage from './pages/UploadPage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import OnboardingPage from './pages/OnboardingPage.jsx'
 import { supabase } from './lib/supabase.js'
+import * as chatStore from './lib/chats.js'
 import './theme.css'
 import './App.css'
 
@@ -18,9 +19,21 @@ export default function App() {
   const [chats, setChats] = useState([])
   const [uploadedFiles, setUploadedFiles] = useState([])
 
-  function createChat(question, jurisdiction) {
-    const id = crypto.randomUUID()
+  // Persists the chat row before returning its id, so it exists by the time
+  // ChatPage mounts and saves the first message into it (see ChatPage.jsx's
+  // auto-send effect). Falls back to a client-only id on failure -- the
+  // chat still works for this session, it just won't survive a refresh or
+  // show up on another device, same as before this feature existed.
+  async function createChat(question, jurisdiction) {
     const title = question.length > 60 ? `${question.slice(0, 57)}…` : question
+
+    let id
+    try {
+      id = await chatStore.createChat(session.user.id, title, jurisdiction)
+    } catch (error) {
+      console.error('Could not save chat -- continuing locally only.', error)
+      id = crypto.randomUUID()
+    }
 
     setChats((currentChats) => [{ id, title, jurisdiction }, ...currentChats])
 
@@ -80,6 +93,26 @@ export default function App() {
     }
 
     loadProfile()
+  }, [session])
+
+  useEffect(() => {
+    async function loadChats() {
+      if (!session?.user?.id) {
+        setChats([])
+        return
+      }
+
+      try {
+        setChats(await chatStore.listChats(session.user.id))
+      } catch (error) {
+        // Same stance as loadProfile() above: log it, don't block the app --
+        // an empty sidebar list is a much smaller problem than the whole
+        // app refusing to render because history couldn't be fetched.
+        console.error(error)
+      }
+    }
+
+    loadChats()
   }, [session])
 
   if (isAuthLoading || isProfileLoading) {

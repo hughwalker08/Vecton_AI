@@ -26,11 +26,11 @@ export default function HomePage({ onStartChat, defaultJurisdiction }) {
   const { attachment, inputRef: attachmentInputRef, handleAttachmentChange, removeAttachment } =
     useAttachment()
 
-  function startChat(text) {
+  async function startChat(text) {
     const trimmed = text.trim()
     if (!trimmed || !jurisdiction) return
 
-    const chatId = onStartChat(trimmed, jurisdiction)
+    const chatId = await onStartChat(trimmed, jurisdiction)
     // ChatPage picks this up on its very first render and carries it into
     // its own attachment state -- see its auto-send effect. Only the text
     // and name need to travel; status/detail are UI-local to this page.

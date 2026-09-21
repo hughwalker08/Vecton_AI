@@ -44,6 +44,11 @@ Migrations:
 - `0006_compliance_feedback` — `compliance_feedback`: a flat log for flagging a
   compliance_analysis finding as wrongly classified (see
   `app/services/compliance_analysis.py`).
+- `0007_chat_history` — `chats` + `chat_messages`, linked to Supabase Auth,
+  with RLS (same pattern as `0004`, not `0006`: this is per-user private
+  data, managed directly by the frontend via the Supabase client -- see
+  `frontend/src/lib/chats.js` -- rather than through an API route, since
+  the backend has no per-user auth wired in).
 
 Schema covers the client's citation requirements: specific clause id
 (`clause_id`) + containment (`hierarchy`), source document (`doc`), verbatim

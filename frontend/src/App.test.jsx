@@ -23,8 +23,19 @@ vi.mock('./api/client.js', () => ({
   uploadDocument: vi.fn(),
 }))
 
+// Chat history (see lib/chats.js) also talks to Supabase directly rather
+// than through the FastAPI backend -- mocked the same way as ./lib/supabase.js
+// above, for the same reason (no VITE_SUPABASE_* env vars in CI).
+vi.mock('./lib/chats.js', () => ({
+  listChats: vi.fn(),
+  createChat: vi.fn(),
+  loadChatMessages: vi.fn(),
+  saveMessage: vi.fn(),
+}))
+
 import { askQuestion, uploadDocument } from './api/client.js'
 import { supabase } from './lib/supabase.js'
+import * as chatStore from './lib/chats.js'
 
 function mockSignedOut() {
   supabase.auth.getSession.mockResolvedValue({ data: { session: null } })
@@ -52,6 +63,13 @@ beforeEach(() => {
   supabase.auth.onAuthStateChange.mockReturnValue({
     data: { subscription: { unsubscribe: vi.fn() } },
   })
+  // Defaults matching the old in-memory behaviour these tests were written
+  // against: no chats yet, and starting one succeeds. A test that cares
+  // about the real persisted list overrides listChats itself.
+  chatStore.listChats.mockResolvedValue([])
+  chatStore.createChat.mockResolvedValue('persisted-chat-id')
+  chatStore.loadChatMessages.mockResolvedValue([])
+  chatStore.saveMessage.mockResolvedValue()
   // App wraps everything in a real BrowserRouter, which reads jsdom's actual
   // window.history -- that persists across tests in this file (jsdom's
   // window isn't recreated per-test), so a test that navigate()s with state
@@ -105,6 +123,23 @@ describe('App', () => {
     expect(screen.getByText(/good (morning|afternoon|evening)/i)).toBeInTheDocument()
   })
 
+  it('loads the signed-in user\'s persisted chats into the sidebar', async () => {
+    mockSignedIn()
+    chatStore.listChats.mockResolvedValue([
+      { id: 'c1', title: 'What ceiling height do we need?', jurisdiction: 'NSW' },
+      { id: 'c2', title: 'What BAL rating applies?', jurisdiction: 'QLD' },
+    ])
+
+    render(<App />)
+
+    // listChats only fires once session is resolved (see App.jsx's loadChats
+    // effect), which happens asynchronously -- findByRole already waits for
+    // that render to land, so it's the right point to check the call too.
+    expect(await screen.findByRole('link', { name: 'What ceiling height do we need?' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'What BAL rating applies?' })).toBeInTheDocument()
+    expect(chatStore.listChats).toHaveBeenCalledWith('user-1')
+  })
+
   it('starting a chat from the home page navigates to the chat page and asks the question', async () => {
     mockSignedIn()
     askQuestion.mockResolvedValue({ answer: 'Riser height is 190mm max.', citations: [], abstained: false })
@@ -122,6 +157,26 @@ describe('App', () => {
       attachment: null,
     })
     // The question that started the chat also shows up as the new sidebar entry.
+    expect(screen.getByRole('link', { name: 'What is the max riser height?' })).toBeInTheDocument()
+    // Persisted before ChatPage mounts and saves the first message into it
+    // -- see App.jsx's createChat and ChatPage.jsx's auto-send effect.
+    expect(chatStore.createChat).toHaveBeenCalledWith('user-1', 'What is the max riser height?', 'NSW')
+  })
+
+  it('still starts the chat locally even if persisting it fails', async () => {
+    mockSignedIn()
+    chatStore.createChat.mockRejectedValue(new Error('network error'))
+    askQuestion.mockResolvedValue({ answer: 'Riser height is 190mm max.', citations: [], abstained: false })
+
+    render(<App />)
+
+    const field = await screen.findByPlaceholderText(/ask about a clause/i)
+    fireEvent.change(field, { target: { value: 'What is the max riser height?' } })
+    fireEvent.submit(field.closest('form'))
+
+    // The chat still works for this session -- it just falls back to a
+    // client-only id rather than one persisted to Supabase.
+    expect(await screen.findByText('Riser height is 190mm max.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'What is the max riser height?' })).toBeInTheDocument()
   })
 

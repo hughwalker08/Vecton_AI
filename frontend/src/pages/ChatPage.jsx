@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { askQuestion } from '../api/client.js'
+import { loadChatMessages, saveMessage } from '../lib/chats.js'
 import { useAttachment } from '../hooks/useAttachment.js'
 import SourcePanel from '../components/SourcePanel.jsx'
 import './ChatPage.css'
@@ -90,6 +91,11 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
       ...currentMessages,
       newMessage,
     ])
+    // Best-effort -- a failed save shouldn't block the chat itself working,
+    // same stance as App.jsx's createChat(). See lib/chats.js.
+    saveMessage(chatId, { role: 'user', text: trimmedQuestion }).catch((error) => {
+      console.error('Could not save this message.', error)
+    })
 
     setQuestion('')
     if (fieldRef.current) fieldRef.current.style.height = 'auto'
@@ -135,6 +141,14 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
         ...currentMessages,
         assistantMessage,
       ])
+      saveMessage(chatId, {
+        role: 'assistant',
+        text: assistantMessage.text,
+        citations: assistantMessage.citations,
+        abstained: assistantMessage.abstained,
+      }).catch((error) => {
+        console.error('Could not save this message.', error)
+      })
     } catch (error) {
       const errorMessage = {
         id: Date.now() + 1,
@@ -156,19 +170,32 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
     }
   }
 
-  // A chat started from the home page arrives here with the question that
-  // kicked it off — send it automatically instead of waiting for the user
-  // to retype it. Guarded by chatId so it only fires once per new chat. A
-  // document attached on the home page (see HomePage.jsx) rides along the
-  // same way, as { name, text } rather than the full attachment record.
+  // Two things happen here, both guarded by the same startedChatId ref so
+  // each only runs once per chatId (not once per render):
   //
-  // startedChatId alone isn't enough: it's a ref, so it resets to null on
-  // any fresh page load of this URL, not just a genuine new chat -- but the
-  // browser's own history state (what location.state reads from) survives a
-  // reload. Without clearing it below, refreshing a chat right after
-  // starting it (or the tab getting reloaded in the background, e.g. by the
-  // dev server's HMR socket reconnecting) replays the first question and
-  // regenerates the answer.
+  // 1. A chat started from the home page arrives with the question that
+  //    kicked it off — send it automatically instead of waiting for the
+  //    user to retype it. A document attached on the home page (see
+  //    HomePage.jsx) rides along the same way, as { name, text } rather
+  //    than the full attachment record.
+  //
+  // 2. Any other chatId (opened from the sidebar, or a direct/reloaded URL)
+  //    has no initialQuestion -- load its persisted history instead of
+  //    starting blank. See lib/chats.js; nothing is loaded for case 1 since
+  //    there's nothing saved yet at that point.
+  //
+  // startedChatId alone isn't enough for case 1: it's a ref, so it resets
+  // to null on any fresh page load of this URL, not just a genuine new
+  // chat -- but the browser's own history state (what location.state reads
+  // from) survives a reload. Without clearing it below, refreshing a chat
+  // right after starting it (or the tab getting reloaded in the background,
+  // e.g. by the dev server's HMR socket reconnecting) replays the first
+  // question and regenerates the answer. That same navigate() call is also
+  // what keeps this effect from re-running case 2 right after case 1 sends
+  // its first message -- it changes location.state, which re-triggers this
+  // effect, but startedChatId.current already equals chatId by then, so the
+  // final branch below is skipped rather than wiping the messages that were
+  // just added.
   useEffect(() => {
     const initialQuestion = location.state?.initialQuestion
     const initialAttachment = location.state?.attachment
@@ -181,6 +208,42 @@ export default function ChatPage({ chats = [], defaultJurisdiction }) {
       if (carriedAttachment) setAttachment(carriedAttachment)
       sendMessage(initialQuestion, carriedAttachment)
       navigate(location.pathname, { replace: true, state: {} })
+      return
+    }
+
+    if (startedChatId.current === chatId) {
+      return
+    }
+    startedChatId.current = chatId
+
+    let cancelled = false
+    setMessages([])
+    loadChatMessages(chatId)
+      .then((rows) => {
+        if (cancelled) return
+        // A functional update, and only replacing an still-empty array:
+        // if the user already typed and sent a question before this fetch
+        // resolved (unlikely, but possible on a slow connection), messages
+        // is no longer [] by the time this runs, and applying the fetched
+        // history over it would silently wipe out what they just sent.
+        setMessages((current) =>
+          current.length === 0
+            ? rows.map((row) => ({
+                id: row.id,
+                role: row.role,
+                text: row.text,
+                citations: row.citations ?? [],
+                abstained: row.abstained,
+              }))
+            : current,
+        )
+      })
+      .catch((error) => {
+        console.error("Could not load this chat's history.", error)
+      })
+
+    return () => {
+      cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, location.state])

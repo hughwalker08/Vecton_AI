@@ -52,7 +52,7 @@ describe('HomePage', () => {
     expect(screen.getByLabelText('Jurisdiction for this chat')).toHaveValue('QLD')
   })
 
-  it('submitting starts a chat and navigates to it with the question and jurisdiction', () => {
+  it('submitting starts a chat and navigates to it with the question and jurisdiction', async () => {
     const onStartChat = vi.fn(() => 'chat-42')
     renderHomePage({ onStartChat })
 
@@ -65,7 +65,10 @@ describe('HomePage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ask' }))
 
     expect(onStartChat).toHaveBeenCalledWith('What ceiling height do we need?', 'NSW')
-    expect(screen.getByText('Chat route rendered')).toBeInTheDocument()
+    // onStartChat is now async (it persists the chat first -- see
+    // App.jsx's createChat), so the navigation it triggers no longer
+    // happens synchronously within the same click.
+    expect(await screen.findByText('Chat route rendered')).toBeInTheDocument()
   })
 
   it('sends on Enter but not on Shift+Enter, and only once a jurisdiction is picked', () => {
