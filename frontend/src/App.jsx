@@ -59,12 +59,23 @@ export default function App() {
     return id
   }
 
+  // The per-user loads below (chats, projects, documents, profile) key on
+  // this, not on the session object: Supabase re-emits an auth event with a
+  // brand-new session object whenever the tab regains focus or the token
+  // refreshes. Keyed on the session, every one of those re-ran all of them,
+  // and the profile load flipped the app back to "Loading...", unmounting
+  // the router and with it whatever chat was open. Each list query also
+  // filters on user_id explicitly rather than leaning on RLS alone, so
+  // Postgres plans it straight onto the (user_id, ...) indexes from
+  // migrations 0009/0011.
+  const userId = session?.user?.id ?? null
+
   // Reloads the sidebar's chat list from Supabase (see migration 0007) so it
   // survives a refresh/new tab, instead of only ever holding what this tab's
   // createChat() has added since it loaded.
   useEffect(() => {
     async function loadChats() {
-      if (!session?.user?.id) {
+      if (!userId) {
         setChats([])
         return
       }
@@ -72,6 +83,7 @@ export default function App() {
       const { data, error } = await supabase
         .from('conversations')
         .select('id, title, jurisdiction, project_id')
+        .eq('user_id', userId)
         .order('updated_at', { ascending: false })
 
       if (error) {
@@ -90,13 +102,13 @@ export default function App() {
     }
 
     loadChats()
-  }, [session])
+  }, [userId])
 
   // Same reload-on-session pattern as loadChats/loadDocuments (see migration
   // 0010): the optional project grouping above chats/folders.
   useEffect(() => {
     async function loadProjects() {
-      if (!session?.user?.id) {
+      if (!userId) {
         setProjects([])
         return
       }
@@ -104,6 +116,7 @@ export default function App() {
       const { data, error } = await supabase
         .from('projects')
         .select('id, name')
+        .eq('user_id', userId)
         .order('created_at', { ascending: true })
 
       if (error) {
@@ -115,24 +128,36 @@ export default function App() {
     }
 
     loadProjects()
-  }, [session])
+  }, [userId])
 
   // Same reload-on-session pattern as loadChats above (see migration 0009):
   // "Project files" and its folders previously lived only in this tab's
   // React state and reset on every refresh.
+  //
+  // `text` (a document's full extraction, easily hundreds of KB per PDF) is
+  // deliberately left out of this list load -- only the compliance check
+  // ever reads it, so it fetches one document's text when that document is
+  // picked (see UploadPage.jsx's ComplianceCheck). Loaded files therefore
+  // have `text` undefined, meaning "not fetched yet", as opposed to '' for a
+  // file that extracted nothing.
   useEffect(() => {
     async function loadDocuments() {
-      if (!session?.user?.id) {
+      if (!userId) {
         setUploadedFiles([])
         setFolders([])
         return
       }
 
       const [foldersResult, documentsResult] = await Promise.all([
-        supabase.from('folders').select('id, name, project_id').order('created_at', { ascending: true }),
+        supabase
+          .from('folders')
+          .select('id, name, project_id')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: true }),
         supabase
           .from('documents')
-          .select('id, folder_id, project_id, name, size, status, detail, text, created_at')
+          .select('id, folder_id, project_id, name, size, status, detail, created_at')
+          .eq('user_id', userId)
           .order('created_at', { ascending: false }),
       ])
 
@@ -155,14 +180,13 @@ export default function App() {
           size: row.size,
           status: row.status,
           detail: row.detail,
-          text: row.text,
           uploadedAt: new Date(row.created_at),
         })),
       )
     }
 
     loadDocuments()
-  }, [session])
+  }, [userId])
 
   useEffect(() => {
     async function loadSession() {
@@ -192,13 +216,6 @@ export default function App() {
       subscription.unsubscribe()
     }
   }, [])
-
-  // Keyed on the user id, not the session object: Supabase re-emits an auth
-  // event with a brand-new session object whenever the tab regains focus or
-  // the token refreshes. Re-running this on every one of those flipped the
-  // app back to "Loading...", unmounting the router and with it whatever
-  // chat was open.
-  const userId = session?.user?.id ?? null
 
   useEffect(() => {
     if (!userId) {
