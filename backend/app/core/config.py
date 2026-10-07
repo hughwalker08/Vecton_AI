@@ -15,6 +15,11 @@ class Settings(BaseSettings):
 
     # --- Database (Supabase / Postgres + pgvector) ---
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/vecton"
+    # Most DB connections the backend will hold open at once (see
+    # app/db/session.py). 15 = the Supabase session pooler's (port 5432) client
+    # limit on the smallest compute; the transaction pooler (port 6543) allows
+    # far more, so raise this if DATABASE_URL moves to it.
+    DB_POOL_SIZE: int = 15
 
     # --- Embedding model ---
     # Decided: Gemini "gemini-embedding-2", 768-dim output. Must match whatever
