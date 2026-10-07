@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App.jsx'
 
@@ -22,6 +22,20 @@ vi.mock('./api/client.js', () => ({
   askQuestion: vi.fn(),
   uploadDocument: vi.fn(),
 }))
+
+// Wraps the real OnboardingPage so a test can count how many times it was
+// rendered (see the "never flashes onboarding" test) without changing what it
+// renders for the tests that do want the real screen.
+const onboardingRenders = vi.hoisted(() => ({ count: 0 }))
+vi.mock('./pages/OnboardingPage.jsx', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    default: function CountedOnboardingPage(props) {
+      onboardingRenders.count += 1
+      return actual.default(props)
+    },
+  }
+})
 
 import { askQuestion, uploadDocument } from './api/client.js'
 import { supabase } from './lib/supabase.js'
@@ -100,6 +114,7 @@ function mockSignedIn({ jurisdiction = 'NSW', email = 'jordan@example.com' } = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  onboardingRenders.count = 0
   supabase.auth.onAuthStateChange.mockReturnValue({
     data: { subscription: { unsubscribe: vi.fn() } },
   })
@@ -123,28 +138,57 @@ describe('App', () => {
     ).toBeInTheDocument()
   })
 
-  // Skipped in CI only: fails reliably on GitHub's Linux runner in ~22-35ms
-  // (too fast to be a real timeout -- findByRole's own retry interval is
-  // 50ms), but has never failed locally across 15+ runs on this machine,
-  // including matching CI's exact setup-node version (20), the Actions
-  // runtime's own Node version (24), a from-scratch npm ci, and forced
-  // single-threaded execution. Diagnostics confirmed both getSession() and
-  // the profile from() call fire with the correct mocked data in CI too --
-  // the mock isn't the problem -- yet the DOM stays on "Loading..." there.
-  // The one variable left untested is the Linux OS itself. Kept enabled
-  // locally since it's a real, useful test everywhere it's been run.
-  it.skipIf(process.env.CI)(
-    'renders onboarding when signed in but no jurisdiction is set yet',
-    async () => {
-      mockSignedIn({ jurisdiction: null })
+  // This used to be `it.skipIf(process.env.CI)`: it failed reliably on
+  // GitHub's runner and only occasionally locally, and nothing explained why.
+  // The cause was a real race in App.jsx -- for one render after sign-in,
+  // profile was still null while the loading flag hadn't flipped, so the
+  // onboarding screen rendered, then got replaced by "Loading...", and
+  // findByRole could grab the heading just before it was detached. Fixed
+  // (loading is now derived from whether this user's profile has resolved),
+  // and covered directly by the render-count test below.
+  it('renders onboarding when signed in but no jurisdiction is set yet', async () => {
+    mockSignedIn({ jurisdiction: null })
 
-      render(<App />)
+    render(<App />)
 
-      expect(
-        await screen.findByRole('heading', { name: /select your state or territory/i }),
-      ).toBeInTheDocument()
-    },
-  )
+    expect(
+      await screen.findByRole('heading', { name: /select your state or territory/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('never renders the onboarding screen for a returning user while their profile loads', async () => {
+    // The bug was a single intermediate render: session arrived, profile still
+    // null, loading flag not yet set. Whether React commits that render to the
+    // DOM is timing-dependent (that's why this used to fail only sometimes),
+    // but whether it *renders* the component is not -- so count renders.
+    mockSignedIn()
+
+    render(<App />)
+    expect(await screen.findByRole('link', { name: /new chat/i })).toBeInTheDocument()
+
+    expect(onboardingRenders.count).toBe(0)
+  })
+
+  it('does not drop back to Loading (and unmount the app) when Supabase re-emits an auth event', async () => {
+    // Supabase fires onAuthStateChange again with a *new* session object when
+    // the tab regains focus. Re-running the profile lookup for it used to
+    // swap the whole app -- router and open chat included -- for "Loading...".
+    mockSignedIn()
+    render(<App />)
+    expect(await screen.findByRole('link', { name: /new chat/i })).toBeInTheDocument()
+    const profileLookups = () =>
+      supabase.from.mock.calls.filter(([table]) => table === 'user_profiles').length
+    expect(profileLookups()).toBe(1)
+
+    const emitAuthEvent = supabase.auth.onAuthStateChange.mock.calls[0][0]
+    await act(async () => {
+      emitAuthEvent('SIGNED_IN', { user: { id: 'user-1', email: 'jordan@example.com' } })
+    })
+
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /new chat/i })).toBeInTheDocument()
+    expect(profileLookups()).toBe(1)
+  })
 
   it('renders the home page, with the sidebar, once signed in with a profile', async () => {
     mockSignedIn()

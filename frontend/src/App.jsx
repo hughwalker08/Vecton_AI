@@ -16,7 +16,11 @@ export default function App() {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
   const [isAuthLoading, setIsAuthLoading] = useState(true)
-  const [isProfileLoading, setIsProfileLoading] = useState(false)
+  // Id of the user whose profile lookup has finished (found or not). Loading
+  // is derived from this rather than a flag the effect flips, so there's no
+  // render between "session arrived" and "lookup started" where profile is
+  // still null and the onboarding screen flashes for a returning user.
+  const [profileUserId, setProfileUserId] = useState(null)
   const [chats, setChats] = useState([])
   const [uploadedFiles, setUploadedFiles] = useState([])
   const [folders, setFolders] = useState([])
@@ -189,31 +193,47 @@ export default function App() {
     }
   }, [])
 
+  // Keyed on the user id, not the session object: Supabase re-emits an auth
+  // event with a brand-new session object whenever the tab regains focus or
+  // the token refreshes. Re-running this on every one of those flipped the
+  // app back to "Loading...", unmounting the router and with it whatever
+  // chat was open.
+  const userId = session?.user?.id ?? null
+
   useEffect(() => {
+    if (!userId) {
+      setProfile(null)
+      setProfileUserId(null)
+      return undefined
+    }
+
+    let cancelled = false
+
     async function loadProfile() {
-      if (!session?.user?.id) {
-        setProfile(null)
-        return
-      }
-
-      setIsProfileLoading(true)
-
       const { data, error } = await supabase
         .from('user_profiles')
         .select('jurisdiction')
-        .eq('id', session.user.id)
+        .eq('id', userId)
         .maybeSingle()
+
+      if (cancelled) return
 
       if (error) {
         console.error(error)
       }
 
       setProfile(data)
-      setIsProfileLoading(false)
+      setProfileUserId(userId)
     }
 
     loadProfile()
-  }, [session])
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+
+  const isProfileLoading = Boolean(userId) && profileUserId !== userId
 
   if (isAuthLoading || isProfileLoading) {
     return <div>Loading...</div>

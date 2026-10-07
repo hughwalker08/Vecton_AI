@@ -116,3 +116,51 @@ def test_build_system_instruction_adds_attachment_addendum_naming_the_document()
 
     assert 'named "site-plan.pdf"' in instruction
     assert "never as a code citation" in instruction
+
+
+def test_format_chunk_includes_heading_when_present():
+    text = gen._format_chunk(_chunk(heading="Footings"))
+
+    assert text.splitlines()[0] == "[H1D4 — NCC 2025 Volume Two: Footings]"
+    assert "Footings must comply." in text
+
+
+def test_format_chunk_omits_heading_when_absent():
+    text = gen._format_chunk(_chunk())
+
+    assert text.splitlines()[0] == "[H1D4 — NCC 2025 Volume Two]"
+
+
+def test_format_chunk_falls_back_to_placeholders_for_missing_fields():
+    text = gen._format_chunk({})
+
+    assert "unknown clause" in text
+    assert "unknown document" in text
+
+
+def test_format_chunk_lists_every_applicability_qualifier_given():
+    chunk = _chunk(
+        building_classes=["1a"],
+        jurisdictions=["NSW", "QLD"],
+        climate_zones=[1, 2],
+        applicability_note="New builds only.",
+    )
+
+    text = gen._format_chunk(chunk)
+
+    assert "building classes: 1a" in text
+    assert "jurisdictions: NSW, QLD" in text
+    assert "climate zones: 1, 2" in text
+    assert "New builds only." in text
+
+
+def test_format_chunk_omits_applicability_line_when_no_qualifiers():
+    assert "Applicability:" not in gen._format_chunk(_chunk())
+
+
+def test_format_chunk_renders_australian_standard_hand_offs():
+    chunk = _chunk(standard_refs=[{"standard": "AS 3786", "clause": "5.1"}, {"standard": "AS 1684"}])
+
+    text = gen._format_chunk(chunk)
+
+    assert "Australian Standard hand-off: AS 3786 5.1, AS 1684" in text

@@ -102,3 +102,66 @@ def test_generate_answer_raises_clean_error_when_no_key_configured(monkeypatch, 
 
     with pytest.raises(generation.GenerationError, match="GEMINI_API_KEY is not set"):
         generation.generate_answer("what is the riser height?", [])
+
+
+def test_generate_answer_raises_without_retrying_a_non_quota_api_error(monkeypatch, backend_settings):
+    monkeypatch.setattr(backend_settings, "GEMINI_API_KEYS", "key1,key2")
+    server_error = genai_errors.APIError(500, {"error": {"message": "boom", "status": "INTERNAL"}})
+    behaviour = {"key1": server_error}
+    monkeypatch.setattr(
+        generation.genai, "Client", lambda api_key, http_options=None: _FakeClient(api_key, behaviour)
+    )
+
+    with pytest.raises(generation.GenerationError, match="Gemini request failed"):
+        generation.generate_answer("what is the riser height?", [])
+
+
+def _single_key_answer(monkeypatch, backend_settings, response):
+    monkeypatch.setattr(backend_settings, "GEMINI_API_KEYS", "key1")
+    behaviour = {"key1": response}
+    monkeypatch.setattr(
+        generation.genai, "Client", lambda api_key, http_options=None: _FakeClient(api_key, behaviour)
+    )
+
+
+def test_generate_answer_raises_when_the_prompt_is_blocked(monkeypatch, backend_settings):
+    response = SimpleNamespace(
+        text="",
+        prompt_feedback=SimpleNamespace(block_reason="SAFETY"),
+        candidates=[SimpleNamespace(finish_reason=None)],
+    )
+    _single_key_answer(monkeypatch, backend_settings, response)
+
+    with pytest.raises(generation.GenerationError, match="Gemini blocked the prompt"):
+        generation.generate_answer("q", [])
+
+
+def test_generate_answer_raises_when_no_candidates_returned(monkeypatch, backend_settings):
+    response = SimpleNamespace(text="", prompt_feedback=None, candidates=[])
+    _single_key_answer(monkeypatch, backend_settings, response)
+
+    with pytest.raises(generation.GenerationError, match="no candidates"):
+        generation.generate_answer("q", [])
+
+
+def test_generate_answer_raises_when_the_answer_was_cut_off(monkeypatch, backend_settings):
+    # A truncated legal citation is worse than no answer -- see the comment
+    # next to the finish_reason check in generate_answer().
+    response = SimpleNamespace(
+        text="Footings must be at lea",
+        prompt_feedback=None,
+        candidates=[SimpleNamespace(finish_reason="MAX_TOKENS")],
+    )
+    _single_key_answer(monkeypatch, backend_settings, response)
+
+    with pytest.raises(generation.GenerationError, match="did not complete cleanly"):
+        generation.generate_answer("q", [])
+
+
+def test_generate_answer_strips_whitespace_and_tolerates_empty_text(monkeypatch, backend_settings):
+    _single_key_answer(monkeypatch, backend_settings, _fake_response("  an answer \n"))
+    assert generation.generate_answer("q", []) == "an answer"
+
+    _single_key_answer(monkeypatch, backend_settings, _fake_response(None))
+    generation._clients.clear()
+    assert generation.generate_answer("q", []) == ""
