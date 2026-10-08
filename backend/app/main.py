@@ -16,7 +16,6 @@ from app.api.routes import chat, compliance, health, upload
 from app.core.config import settings
 
 
-
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # Every plain `def` route (chat, compliance, health, ...) runs on a worker
