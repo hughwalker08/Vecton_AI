@@ -336,7 +336,10 @@ def describe_image_bytes(
     payload, mime = prepare_payload(data, name)
 
     handle = model if model is not None else build_model(model_name)
-    contents = [with_caption(prompt, caption), {"mime_type": mime, "data": payload}]
+    contents = [
+        with_caption(prompt, caption, caption_in_image),
+        {"mime_type": mime, "data": payload},
+    ]
 
     def _call(key: str):
         import google.generativeai as genai

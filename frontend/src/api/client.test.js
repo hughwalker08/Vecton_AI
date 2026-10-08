@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { askQuestion, uploadDocument } from './client.js'
+import { analyseDocument, askQuestion, flagFinding, uploadDocument } from './client.js'
 
 function fakeResponse({ ok = true, status = 200, body = {} } = {}) {
   return {
@@ -171,5 +171,89 @@ describe('uploadDocument', () => {
     await uploadDocument(new File(['x'], 'a.pdf'), { describeImages: false })
 
     expect(fetchMock.mock.calls[0][0]).toBe('/api/upload/?describe_images=false')
+  })
+})
+
+describe('analyseDocument', () => {
+  const body = { document_text: 'Footings: 600mm', query: 'footings', jurisdiction: 'NSW' }
+
+  it('POSTs the request as JSON to /api/compliance/analyse and returns the report', async () => {
+    const report = { query: 'footings', findings: [], counts: {} }
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ body: report }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(analyseDocument(body)).resolves.toEqual(report)
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/compliance/analyse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  })
+
+  it('throws the backend detail when it is a string (e.g. the 429 quota message)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        fakeResponse({ ok: false, status: 429, body: { detail: 'Quota exceeded. Try again in about 30s.' } }),
+      ),
+    )
+
+    await expect(analyseDocument(body)).rejects.toThrow('Quota exceeded. Try again in about 30s.')
+  })
+
+  it('falls back to the status code when the detail is not a string (a 422 validation array)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        fakeResponse({ ok: false, status: 422, body: { detail: [{ loc: ['body', 'query'], msg: 'required' }] } }),
+      ),
+    )
+
+    await expect(analyseDocument(body)).rejects.toThrow('Compliance check failed (422)')
+  })
+
+  it('falls back to the status code when the error body is not JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 502, json: () => Promise.reject(new Error('not json')) }),
+    )
+
+    await expect(analyseDocument(body)).rejects.toThrow('Compliance check failed (502)')
+  })
+})
+
+describe('flagFinding', () => {
+  const body = { clause_id: 'H1D4', query: 'footings', reported_status: 'missing' }
+
+  it('POSTs the flag as JSON to /api/compliance/feedback and returns the response', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(fakeResponse({ body: { id: 'abc' } }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(flagFinding(body)).resolves.toEqual({ id: 'abc' })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/compliance/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  })
+
+  it('throws the backend detail when it is a string', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(fakeResponse({ ok: false, status: 400, body: { detail: 'Unknown status.' } })),
+    )
+
+    await expect(flagFinding(body)).rejects.toThrow('Unknown status.')
+  })
+
+  it('falls back to the status code when there is no usable detail', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 500, json: () => Promise.reject(new Error('not json')) }),
+    )
+
+    await expect(flagFinding(body)).rejects.toThrow('Could not send feedback (500)')
   })
 })
