@@ -20,8 +20,13 @@ export default defineConfig({
     testTimeout: 10000,
     coverage: {
       provider: 'v8',
+      // Vitest skips the coverage report entirely if any test fails, which
+      // hides the numbers exactly when you're debugging. Always print them.
+      reportOnFailure: true,
       reporter: ['text', 'html', 'lcov'],
-      exclude: ['src/main.jsx', 'src/test/**'],
+      // Test files and config aren't application code: counting them (a test
+      // file is ~100% covered by definition) padded the total by ~5 points.
+      exclude: ['src/main.jsx', 'src/test/**', '**/*.test.{js,jsx}', 'vite.config.js'],
     },
   },
 })
