@@ -6,13 +6,32 @@ Run locally with:
     uvicorn app.main:app --reload
 """
 
+from contextlib import asynccontextmanager
+
+import anyio.to_thread
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import chat, compliance, health, upload
 from app.core.config import settings
 
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Every plain `def` route (chat, compliance, health, ...) runs on a worker
+    # thread, and Starlette shares one pool of them, 40 by default. A chat
+    # request holds its thread for the whole embed -> search -> rerank -> LLM
+    # round trip (seconds, nearly all of it waiting on Gemini/Hugging Face),
+    # so 40 simultaneous chats used to fill the pool and queue everything
+    # else behind them -- even /health. Waiting threads cost memory, not CPU,
+    # so the pool is sized for the concurrency we expect instead.
+    anyio.to_thread.current_default_thread_limiter().total_tokens = settings.WORKER_THREADS
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title=settings.PROJECT_NAME,
     description=(
         "AI-powered assistant for NSW construction compliance research "

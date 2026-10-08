@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     # far more, so raise this if DATABASE_URL moves to it.
     DB_POOL_SIZE: int = 15
 
+    # Requests the backend serves at once (see app/main.py's lifespan). Each
+    # chat holds one for its full multi-second round trip to Gemini/Hugging
+    # Face, so this, not CPU, is what caps simultaneous users.
+    WORKER_THREADS: int = 200
+
     # --- Embedding model ---
     # Decided: Gemini "gemini-embedding-2", 768-dim output. Must match whatever
     # model produced app/ingest/output/*.embedded.json (see the .meta.json next
