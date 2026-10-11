@@ -61,6 +61,10 @@ class Settings(BaseSettings):
     # transformers dependency in the backend). See app/services/retrieval.py.
     RERANKER_MODEL_NAME: str = "BAAI/bge-reranker-base"
     HF_API_TOKEN: str = ""
+    # "hf" (default): call Hugging Face's hosted model -- needs HF_API_TOKEN
+    # and credits. "local": run the same model on this machine, free; needs
+    # `pip install -r requirements-local-rerank.txt`. Dev/testing only.
+    RERANKER_BACKEND: str = "hf"
 
     # --- Document parsing for user uploads ---
     # Decided: "llamaparse" for PDF (external API - needs client sign-off).

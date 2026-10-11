@@ -234,3 +234,89 @@ def test_retrieve_runs_hybrid_search_then_rerank_in_order(monkeypatch):
     assert result == [{"reranked": True}]
     assert calls[0] == ("hybrid_search", "footings", 20, "NSW")
     assert calls[1][0] == "rerank" and calls[1][3] == 5
+
+
+# --- RERANKER_BACKEND=local --------------------------------------------
+
+
+def test_rerank_defaults_to_the_hosted_backend(monkeypatch, backend_settings):
+    # The deployed backend must keep calling Hugging Face unless someone opts
+    # in to the local model -- PyTorch isn't in requirements.txt.
+    assert backend_settings.RERANKER_BACKEND == "hf"
+    monkeypatch.setattr(backend_settings, "HF_API_TOKEN", "fake-token")
+    monkeypatch.setattr(retrieval, "_local_scores", lambda *a, **k: pytest.fail("must not run locally"))
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: _response(200, json_body=[[{"score": 0.4}]]))
+
+    assert retrieval.rerank("q", [_candidate()])[0]["rerank_score"] == 0.4
+
+
+def test_rerank_local_backend_never_calls_hugging_face_or_needs_a_token(monkeypatch, backend_settings):
+    monkeypatch.setattr(backend_settings, "RERANKER_BACKEND", "local")
+    monkeypatch.setattr(backend_settings, "HF_API_TOKEN", "")
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: pytest.fail("must not call the hosted API"))
+    monkeypatch.setattr(retrieval, "_local_scores", lambda query, candidates: [0.2, 0.9])
+
+    results = retrieval.rerank("q", [_candidate(clause_id="A"), _candidate(clause_id="B")])
+
+    assert [r["clause_id"] for r in results] == ["B", "A"]
+    assert results[0]["rerank_score"] == 0.9
+
+
+def test_rerank_local_backend_still_rejects_a_score_count_mismatch(monkeypatch, backend_settings):
+    monkeypatch.setattr(backend_settings, "RERANKER_BACKEND", "local")
+    monkeypatch.setattr(retrieval, "_local_scores", lambda query, candidates: [0.5])
+
+    with pytest.raises(retrieval.RerankError, match="2 candidates"):
+        retrieval.rerank("q", [_candidate(), _candidate()])
+
+
+class _FakeCrossEncoder:
+    loads = 0
+
+    def __init__(self, name, max_length):
+        type(self).loads += 1
+        self.name, self.max_length = name, max_length
+        self.seen = None
+
+    def predict(self, pairs):
+        self.seen = pairs
+        return [0.25, 0.75]  # plain floats, as numpy would hand back
+
+
+def _install_fake_sentence_transformers(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+
+    _FakeCrossEncoder.loads = 0
+    monkeypatch.setitem(sys.modules, "sentence_transformers", SimpleNamespace(CrossEncoder=_FakeCrossEncoder))
+    monkeypatch.setattr(retrieval, "_local_model", None)
+
+
+def test_local_scores_pairs_the_query_with_each_candidate_text(monkeypatch, backend_settings):
+    _install_fake_sentence_transformers(monkeypatch)
+
+    scores = retrieval._local_scores("q", [_candidate(text="first"), _candidate(text=None)])
+
+    assert scores == [0.25, 0.75]
+    assert retrieval._local_model.seen == [("q", "first"), ("q", "")]
+    assert retrieval._local_model.name == backend_settings.RERANKER_MODEL_NAME
+    assert retrieval._local_model.max_length == retrieval.RERANKER_MAX_LENGTH
+
+
+def test_local_scores_loads_the_model_once_and_reuses_it(monkeypatch):
+    # ~1 GB model: reloading per question would add seconds to every chat.
+    _install_fake_sentence_transformers(monkeypatch)
+
+    retrieval._local_scores("q", [_candidate(), _candidate()])
+    retrieval._local_scores("q2", [_candidate(), _candidate()])
+
+    assert _FakeCrossEncoder.loads == 1
+
+
+def test_local_scores_explains_how_to_install_the_extra_packages(monkeypatch):
+    import sys
+
+    monkeypatch.setitem(sys.modules, "sentence_transformers", None)  # makes the import fail
+
+    with pytest.raises(retrieval.RerankError, match="requirements-local-rerank.txt"):
+        retrieval._local_scores("q", [_candidate()])

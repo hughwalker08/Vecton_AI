@@ -150,15 +150,8 @@ def hybrid_search(query: str, top_k: int = 10, jurisdiction: str | None = None) 
     return [dict(row) for row in rows]
 
 
-def rerank(query: str, candidates: list[dict], top_n: int = 10) -> list[dict]:
-    """Reorder `candidates` by true relevance to `query` using a cross-encoder
-    (BAAI/bge-reranker-base) and return the top_n.
-
-    One HF Inference call scores every candidate against the query in a
-    single batched request. Adds a `rerank_score` key to each returned dict.
-    """
-    if not candidates:
-        return []
+def _hf_scores(query: str, candidates: list[dict]) -> list[float]:
+    """Score every candidate against the query via Hugging Face's hosted model."""
     if not settings.HF_API_TOKEN:
         raise RerankError(
             "HF_API_TOKEN is not set. Add it to backend/.env "
@@ -195,9 +188,59 @@ def rerank(query: str, candidates: list[dict], top_n: int = 10) -> list[dict]:
     # The router batches same-shape pair inputs into one inner list, in the
     # order given: [[{"label": ..., "score": s0}, {"label": ..., "score": s1}, ...]]
     try:
-        scores = [item["score"] for item in data[0]]
+        return [item["score"] for item in data[0]]
     except (KeyError, IndexError, TypeError) as exc:
         raise RerankError(f"Unexpected rerank response shape: {data!r}") from exc
+
+
+# Loaded on first use and kept for the life of the process: the model is
+# ~1 GB, so reloading it per question would make every chat take seconds.
+_local_model = None
+
+
+def _local_scores(query: str, candidates: list[dict]) -> list[float]:
+    """Score candidates with the same model run on this machine (no API, no credits).
+
+    Opt-in via RERANKER_BACKEND=local, for development and testing when the
+    hosted route is unavailable or out of credit. Needs the extra packages in
+    requirements-local-rerank.txt, deliberately kept out of requirements.txt
+    so the deployed backend doesn't carry PyTorch. A single-output
+    cross-encoder is scored through a sigmoid, so these are 0-1 values on the
+    same scale as the hosted model's -- MIN_RERANK_SCORE in api/routes/chat.py
+    means the same thing either way.
+    """
+    global _local_model
+    try:
+        from sentence_transformers import CrossEncoder
+    except ImportError as exc:
+        raise RerankError(
+            "RERANKER_BACKEND=local needs extra packages. Run: "
+            "pip install -r requirements-local-rerank.txt"
+        ) from exc
+
+    if _local_model is None:
+        _local_model = CrossEncoder(settings.RERANKER_MODEL_NAME, max_length=RERANKER_MAX_LENGTH)
+
+    pairs = [(query, c.get("text") or "") for c in candidates]
+    return [float(score) for score in _local_model.predict(pairs)]
+
+
+def rerank(query: str, candidates: list[dict], top_n: int = 10) -> list[dict]:
+    """Reorder `candidates` by true relevance to `query` using a cross-encoder
+    (BAAI/bge-reranker-base) and return the top_n.
+
+    Scores come from Hugging Face's hosted model by default, or from a local
+    copy of it when settings.RERANKER_BACKEND == "local". One batched call
+    scores every candidate against the query. Adds a `rerank_score` key to
+    each returned dict.
+    """
+    if not candidates:
+        return []
+
+    if settings.RERANKER_BACKEND == "local":
+        scores = _local_scores(query, candidates)
+    else:
+        scores = _hf_scores(query, candidates)
 
     if len(scores) != len(candidates):
         raise RerankError(
