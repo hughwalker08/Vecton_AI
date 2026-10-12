@@ -1,0 +1,5 @@
+# Optional: run the reranker locally instead of calling Hugging Face
+# (RERANKER_BACKEND=local). Not part of requirements.txt on purpose -- this
+# pulls in PyTorch (~hundreds of MB) plus a ~1 GB model download on first use,
+# which the deployed backend deliberately avoids.
+sentence-transformers>=3.0,<6
