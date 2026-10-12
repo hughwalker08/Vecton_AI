@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Figure Description Review</title>
+<style>
+  :root {
+    --paper:  #f4f5f4;
+    --panel:  #ffffff;
+    --sunk:   #ebedec;
+    --ink:    #1a1d1c;
+    --ink-2:  #4c5250;
+    --ink-3:  #7a817e;
+    --rule:   #d8dbd9;
+    --rule-2: #bfc4c1;
+    --accent: #1f5673;
+    --ok:     #2f6b46;
+    --ok-bg:  #e6f1ea;
+    --bad:    #9b3a30;
+    --bad-bg: #f7e8e6;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #141817; --panel: #1b201f; --sunk: #232927; --ink: #e6eae8;
+      --ink-2: #b0b7b4; --ink-3: #858d8a; --rule: #2d3432; --rule-2: #3e4644;
+      --accent: #8ab9d3; --ok: #7cc296; --ok-bg: #1b2d23; --bad: #e39288; --bad-bg: #2e1f1d;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.5;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex; align-items: center; gap: 18px;
+    padding: 10px 16px; background: var(--panel);
+    border-bottom: 1px solid var(--rule); flex: none;
+  }
+  .brand { font-weight: 650; letter-spacing: -.01em; white-space: nowrap; }
+  .group-pill {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+    text-transform: uppercase; padding: 3px 8px; border-radius: 3px;
+    background: var(--accent); color: var(--panel); font-weight: 600;
+  }
+  .counts { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+  .counts b { color: var(--ink); }
+  .bar { flex: 1; height: 7px; background: var(--sunk); border-radius: 4px; overflow: hidden; min-width: 80px; }
+  .bar span { display: block; height: 100%; background: var(--ok); width: 0; transition: width .2s; }
+  .saved { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); white-space: nowrap; min-width: 86px; text-align: right; }
+  .saved.err { color: var(--bad); font-weight: 600; }
+
+  /* ---------- main split ---------- */
+  main { flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+
+  .pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .pane + .pane { border-left: 1px solid var(--rule); }
+  @media (max-width: 900px) { .pane + .pane { border-left: 0; border-top: 1px solid var(--rule); } }
+
+  .pane-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 7px 14px; background: var(--sunk); border-bottom: 1px solid var(--rule);
+    font-family: var(--mono); font-size: 11px; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--ink-3); flex: none;
+  }
+  .pane-body { flex: 1; overflow: auto; padding: 16px; }
+
+  #figure-wrap { display: grid; place-items: start center; background: #fff; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) #figure-wrap { background: #f7f7f7; } }
+  #figure { max-width: 100%; display: block; cursor: zoom-in; }
+  #figure.zoomed { max-width: none; cursor: zoom-out; }
+
+  .caption { font-weight: 600; margin: 0 0 14px; color: var(--ink); }
+  .meta { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); margin-bottom: 14px; }
+
+  /* ---------- rendered description ---------- */
+  .desc h3 {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--accent); margin: 18px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--rule);
+  }
+  .desc h3:first-child { margin-top: 0; }
+  .desc p { margin: 0 0 10px; }
+  .desc ul { margin: 0 0 10px; padding-left: 20px; }
+  .desc li { margin-bottom: 4px; }
+
+  /* ---------- verdict bar ---------- */
+  footer {
+    flex: none; background: var(--panel); border-top: 1px solid var(--rule); padding: 12px 16px;
+  }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  button {
+    font: inherit; font-weight: 600; border: 1px solid var(--rule-2); background: var(--panel);
+    color: var(--ink); padding: 9px 16px; border-radius: 5px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--ink-3); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button kbd {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 500; opacity: .65;
+    border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; margin-left: 7px;
+  }
+  .btn-ok      { color: var(--ok);  border-color: var(--ok); }
+  .btn-ok.on   { background: var(--ok); color: #fff; border-color: var(--ok); }
+  .btn-bad     { color: var(--bad); border-color: var(--bad); }
+  .btn-bad.on  { background: var(--bad); color: #fff; border-color: var(--bad); }
+  .spacer { flex: 1; }
+
+  #issue-box { margin-top: 12px; display: none; }
+  #issue-box.show { display: block; }
+  #issue-box label {
+    display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 6px; font-weight: 600;
+  }
+  #issue-box label span { font-weight: 400; color: var(--ink-3); }
+  textarea {
+    width: 100%; min-height: 76px; resize: vertical; font: inherit; padding: 9px 11px;
+    border: 1px solid var(--rule-2); border-radius: 5px; background: var(--paper); color: var(--ink);
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .hint { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+  .hint.warn { color: var(--bad); font-weight: 600; }
+
+  .status-chip {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 3px; font-weight: 600;
+  }
+  .status-chip.correct   { background: var(--ok-bg);  color: var(--ok); }
+  .status-chip.incorrect { background: var(--bad-bg); color: var(--bad); }
+  .status-chip.pending   { background: var(--sunk);   color: var(--ink-3); }
+
+  #toast {
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(10px);
+    background: var(--ink); color: var(--paper); padding: 9px 16px; border-radius: 5px;
+    font-size: 13.5px; opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="brand">Figure Review</span>
+  <span class="group-pill" id="group-pill">—</span>
+  <span class="counts" id="counts">loading…</span>
+  <div class="bar"><span id="bar-fill"></span></div>
+  <span class="saved" id="saved">—</span>
+</header>
+
+<main>
+  <section class="pane">
+    <div class="pane-head">
+      <span id="fig-pos">—</span>
+      <span id="fig-file"></span>
+    </div>
+    <div class="pane-body" id="figure-wrap">
+      <img id="figure" alt="Figure under review">
+    </div>
+  </section>
+
+  <section class="pane">
+    <div class="pane-head">
+      <span>Generated description</span>
+      <span id="desc-meta"></span>
+    </div>
+    <div class="pane-body">
+      <p class="caption" id="caption"></p>
+      <div class="meta" id="meta"></div>
+      <div class="desc" id="desc"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="row">
+    <button id="prev">← Prev<kbd>←</kbd></button>
+    <button id="next">Next →<kbd>→</kbd></button>
+    <button id="next-unreviewed">Next unreviewed<kbd>U</kbd></button>
+    <span class="status-chip pending" id="status">unreviewed</span>
+    <span class="spacer"></span>
+    <button class="btn-ok"  id="btn-correct">Correct<kbd>1</kbd></button>
+    <button class="btn-bad" id="btn-incorrect">Incorrect<kbd>2</kbd></button>
+  </div>
+
+  <div id="issue-box">
+    <label for="issue">
+      Which parts of the description are wrong?
+      <span>— be specific: the wrong value, the mislabelled part, what it says vs what the drawing shows.</span>
+    </label>
+    <textarea id="issue" placeholder="e.g. Says the waterstop sits below the membrane; the drawing shows it above. Riser dimension given as 190 mm but the figure reads 190 mm max."></textarea>
+    <div class="row" style="margin-top:8px">
+      <button id="save-issue">Save &amp; next<kbd>Ctrl ↵</kbd></button>
+      <button id="cancel-issue">Cancel<kbd>Esc</kbd></button>
+      <span class="hint" id="issue-hint">Required — an “incorrect” verdict is only useful if it says what is wrong.</span>
+    </div>
+  </div>
+</footer>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var items = [];       // [{key, corpus, file, image_url, caption, description, model, ...}]
+  var results = {};     // key -> {verdict, issues, reviewed_at}
+  var idx = 0;
+  var group = "?";
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ---------- tiny markdown renderer ----------
+  // The descriptions are a fixed six-heading markdown shape produced by
+  // image_description.py: "## Heading", "- bullet" / "*   bullet", paragraphs.
+  // A full markdown library would be more than this needs.
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function renderDescription(text) {
+    var out = [], list = null;
+    (text || "").split(/\r?\n/).forEach(function (raw) {
+      var line = raw.replace(/\s+$/, "");
+      var heading = line.match(/^#{1,6}\s+(.*)$/);
+      var bullet = line.match(/^\s*(?:[-*+]|\d+\.)\s+(.*)$/);
+      if (heading) {
+        if (list) { out.push("</ul>"); list = null; }
+        out.push("<h3>" + escapeHtml(heading[1]) + "</h3>");
+      } else if (bullet) {
+        if (!list) { out.push("<ul>"); list = true; }
+        out.push("<li>" + escapeHtml(bullet[1]) + "</li>");
+      } else if (!line.trim()) {
+        if (list) { out.push("</ul>"); list = null; }
+      } else {
+        if (list) { out.push("</ul>"); list = null; }
+        out.push("<p>" + escapeHtml(line) + "</p>");
+      }
+    });
+    if (list) out.push("</ul>");
+    return out.join("");
+  }
+
+  // ---------- status / saving ----------
+  var toastTimer = null;
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 1600);
+  }
+  function setSaved(text, isError) {
+    var el = $("saved");
+    el.textContent = text;
+    el.classList.toggle("err", !!isError);
+  }
+
+  function counts() {
+    var done = 0, bad = 0;
+    items.forEach(function (it) {
+      var r = results[it.key];
+      if (r && r.verdict) { done++; if (r.verdict === "incorrect") bad++; }
+    });
+    return { done: done, bad: bad, total: items.length };
+  }
+
+  function paintCounts() {
+    var c = counts();
+    $("counts").innerHTML = "<b>" + c.done + "</b>/" + c.total +
+      " reviewed · <b>" + (c.done - c.bad) + "</b> correct · <b>" + c.bad + "</b> incorrect";
+    $("bar-fill").style.width = (c.total ? (c.done / c.total * 100) : 0) + "%";
+  }
+
+  function save(key, verdict, issues) {
+    setSaved("saving…");
+    return fetch("api/review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: key, verdict: verdict, issues: issues || "" })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (data) {
+      results[key] = data.entry;
+      paintCounts();
+      setSaved("saved " + new Date().toLocaleTimeString());
+      return data;
+    }).catch(function (err) {
+      setSaved("SAVE FAILED", true);
+      toast("Could not save — " + err.message + ". Your verdict was not recorded.");
+      throw err;
+    });
+  }
+
+  // ---------- rendering one item ----------
+  function show(i) {
+    if (!items.length) return;
+    idx = Math.max(0, Math.min(items.length - 1, i));
+    var it = items[idx];
+    var r = results[it.key] || {};
+
+    $("fig-pos").textContent = (idx + 1) + " / " + items.length;
+    $("fig-file").textContent = it.corpus + " · " + it.file;
+    var img = $("figure");
+    img.classList.remove("zoomed");
+    img.src = it.image_url;
+    img.alt = it.caption || it.file;
+
+    $("caption").textContent = it.caption || "(no caption)";
+    $("meta").textContent = [it.doc, it.model, it.prompt_variant ? "prompt: " + it.prompt_variant : null,
+                             it.chars ? it.chars + " chars" : null]
+                            .filter(Boolean).join("  ·  ");
+    $("desc-meta").textContent = it.key;
+    $("desc").innerHTML = renderDescription(it.description);
+    $("desc").parentElement.scrollTop = 0;
+    $("figure-wrap").scrollTop = 0;
+
+    var chip = $("status");
+    chip.className = "status-chip " + (r.verdict || "pending");
+    chip.textContent = r.verdict ? r.verdict : "unreviewed";
+    $("btn-correct").classList.toggle("on", r.verdict === "correct");
+    $("btn-incorrect").classList.toggle("on", r.verdict === "incorrect");
+
+    // Re-open the issue box when revisiting something marked incorrect,
+    // so a previous note can be read and amended rather than silently kept.
+    if (r.verdict === "incorrect") {
+      $("issue").value = r.issues || "";
+      openIssue(false);
+    } else {
+      $("issue").value = "";
+      closeIssue();
+    }
+    $("prev").disabled = idx === 0;
+    $("next").disabled = idx === items.length - 1;
+  }
+
+  function openIssue(focus) {
+    $("issue-box").classList.add("show");
+    $("issue-hint").classList.remove("warn");
+    if (focus !== false) $("issue").focus();
+  }
+  function closeIssue() {
+    $("issue-box").classList.remove("show");
+    $("issue-hint").classList.remove("warn");
+  }
+
+  function nextUnreviewed(from) {
+    for (var n = 1; n <= items.length; n++) {
+      var i = ((from == null ? idx : from) + n) % items.length;
+      if (!results[items[i].key] || !results[items[i].key].verdict) return i;
+    }
+    return -1;
+  }
+
+  function goNextUnreviewed() {
+    var i = nextUnreviewed();
+    if (i < 0) { toast("Every figure in this group has been reviewed."); return; }
+    show(i);
+  }
+
+  // ---------- actions ----------
+  function markCorrect() {
+    var it = items[idx];
+    save(it.key, "correct", "").then(function () {
+      closeIssue();
+      var i = nextUnreviewed();
+      show(i < 0 ? idx : i);
+      if (i < 0) toast("All done — every figure reviewed.");
+    });
+  }
+
+  function markIncorrect() {
+    $("btn-incorrect").classList.add("on");
+    $("btn-correct").classList.remove("on");
+    openIssue(true);
+  }
+
+  function saveIssue() {
+    var text = $("issue").value.trim();
+    if (!text) {
+      $("issue-hint").classList.add("warn");
+      $("issue-hint").textContent = "Required — say which part is wrong before saving.";
+      $("issue").focus();
+      return;
+    }
+    var it = items[idx];
+    save(it.key, "incorrect", text).then(function () {
+      closeIssue();
+      var i = nextUnreviewed();
+      show(i < 0 ? idx : i);
+      if (i < 0) toast("All done — every figure reviewed.");
+    });
+  }
+
+  // ---------- wiring ----------
+  $("prev").onclick = function () { show(idx - 1); };
+  $("next").onclick = function () { show(idx + 1); };
+  $("next-unreviewed").onclick = goNextUnreviewed;
+  $("btn-correct").onclick = markCorrect;
+  $("btn-incorrect").onclick = markIncorrect;
+  $("save-issue").onclick = saveIssue;
+  $("cancel-issue").onclick = function () { show(idx); };
+  $("figure").onclick = function () { this.classList.toggle("zoomed"); };
+
+  document.addEventListener("keydown", function (e) {
+    var typing = e.target.tagName === "TEXTAREA" || e.target.tagName === "INPUT";
+    if (typing) {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveIssue(); }
+      if (e.key === "Escape") { e.preventDefault(); show(idx); }
+      return;
+    }
+    if (e.key === "ArrowLeft")  { e.preventDefault(); show(idx - 1); }
+    if (e.key === "ArrowRight") { e.preventDefault(); show(idx + 1); }
+    if (e.key === "1" || e.key.toLowerCase() === "c") { e.preventDefault(); markCorrect(); }
+    if (e.key === "2" || e.key.toLowerCase() === "x") { e.preventDefault(); markIncorrect(); }
+    if (e.key.toLowerCase() === "u") { e.preventDefault(); goNextUnreviewed(); }
+  });
+
+  window.addEventListener("beforeunload", function (e) {
+    if ($("issue-box").classList.contains("show") && $("issue").value.trim()) {
+      e.preventDefault(); e.returnValue = "";
+    }
+  });
+
+  // ---------- boot ----------
+  Promise.all([
+    fetch("api/items").then(function (r) { return r.json(); }),
+    fetch("api/review").then(function (r) { return r.json(); })
+  ]).then(function (both) {
+    items = both[0].items;
+    group = both[0].group;
+    results = both[1].results || {};
+    $("group-pill").textContent = "Group " + group.toUpperCase();
+    document.title = "Figure Review — Group " + group.toUpperCase();
+    paintCounts();
+    var start = nextUnreviewed(-1);
+    show(start < 0 ? 0 : start);
+    setSaved("ready");
+  }).catch(function (err) {
+    document.body.innerHTML =
+      '<div style="padding:40px;font-family:var(--sans)"><h2>Could not load the review set</h2><p>' +
+      escapeHtml(err.message) + '</p><p>Start the app with <code>python scripts/review_descriptions.py --group a</code>.</p></div>';
+  });
+})();
+</script>
+</body>
+</html>

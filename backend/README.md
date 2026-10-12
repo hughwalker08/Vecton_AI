@@ -289,6 +289,39 @@ pinned there deliberately: it must keep matching whatever model produced the
 stored corpus embeddings (`gemini-embedding-2` — changing it without
 re-embedding the corpus breaks retrieval).
 
+## Reviewing the figure descriptions
+
+The 270 generated descriptions have never been checked against the drawings
+they describe. `scripts/review_descriptions.py` is a small local app for doing
+that, split so two people can work in parallel without colliding.
+
+```bash
+cd backend
+python scripts/review_descriptions.py --group a --reviewer "Your Name"   # reviewer 1
+python scripts/review_descriptions.py --group b --reviewer "Their Name"  # reviewer 2
+python scripts/review_descriptions.py --group a --summary                # progress, no server
+```
+
+Each opens `http://127.0.0.1:8900` with the figure on the left and its
+description on the right. `1` marks it correct, `2` marks it incorrect and
+opens a box that **must** say what is wrong -- a bare "incorrect" tells
+whoever fixes it nothing. `U` jumps to the next unreviewed figure, arrows
+navigate, clicking the image zooms it.
+
+Results land in `data/review/group-a.json` and `data/review/group-b.json`,
+written after every verdict (atomically, via a temp file) so there is no save
+step and closing the tab loses nothing. Re-running resumes where you left off.
+
+The split is deterministic and alternating, so each reviewer gets 135 figures
+with the same mix of Volume Two and Housing Provisions -- a straight halving
+would have given one person every Volume Two drawing. Re-running never
+reshuffles an in-progress workload.
+
+Stdlib only, no new dependencies. It runs a tiny server rather than being a
+plain `file://` page because the figures are 39 MB (too much to inline) and a
+`file://` page cannot write to disk -- it could only offer a download the
+reviewer has to remember, repeatedly, with no crash safety.
+
 ## Decisions locked in
 
 - **Embeddings:** Gemini `gemini-embedding-2` (768-dim) — `services/embedding.py`.

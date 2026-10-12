@@ -49,6 +49,12 @@ _HF_ROUTER_URL = "https://router.huggingface.co/hf-inference/models/{model}"
 RERANKER_MAX_LENGTH = 512
 
 
+# One client for every rerank call, so its connection to the HF router stays
+# open between questions instead of re-paying the TLS handshake each time.
+# httpx.Client is safe to share across the worker threads chat requests run on.
+_http = httpx.Client(timeout=30.0)
+
+
 class RerankError(Exception):
     """Raised when the reranker cannot run (missing config, API failure, etc.)."""
 
@@ -168,11 +174,10 @@ def rerank(query: str, candidates: list[dict], top_n: int = 10) -> list[dict]:
     }
 
     try:
-        response = httpx.post(
+        response = _http.post(
             url,
             json=payload,
             headers={"Authorization": f"Bearer {settings.HF_API_TOKEN}"},
-            timeout=30.0,
         )
         response.raise_for_status()
         data = response.json()

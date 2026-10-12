@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { analyseDocument, flagFinding } from '../api/client.js'
 import FolderBrowser from '../components/FolderBrowser.jsx'
+import { supabase } from '../lib/supabase.js'
 import './UploadPage.css'
 import SourcePanel from '../components/SourcePanel.jsx'
 
@@ -143,9 +144,31 @@ export function ComplianceCheck({ jurisdiction, files, folders = [] }) {
   const [filter, setFilter] = useState(null)
 
   const [selectedFileId, setSelectedFileId] = useState('')
+  // The selection a text fetch was started for -- a slower fetch for an
+  // earlier pick must not overwrite the box once the user has moved on.
+  const latestSelection = useRef('')
   const [reportFile, setReportFile] = useState('')
   const [openSource, setOpenSource] = useState(null)
   const canSubmit = query.trim() && documentText.trim() && !loading
+
+  // Only overwrite the textarea when the file actually extracted something --
+  // a scanned PDF with no text layer, for instance, extracts to '' and should
+  // leave whatever's already typed alone.
+  function fillFromText(text) {
+    if (text) setDocumentText(text)
+  }
+
+  // Documents loaded from Supabase arrive without their text (App.jsx's
+  // loadDocuments leaves it out of the list query), so fetch just this one.
+  async function loadDocumentText(id) {
+    const { data, error } = await supabase.from('documents').select('text').eq('id', id).maybeSingle()
+    if (error) {
+      console.error(error)
+      return
+    }
+    if (latestSelection.current !== String(id)) return
+    fillFromText(data?.text)
+  }
 
   const uploadedFiles = files.filter((f) => f.status === 'done')
   // If the chosen file was removed from the list, fall back to "none selected".
@@ -241,12 +264,15 @@ export function ComplianceCheck({ jurisdiction, files, folders = [] }) {
             onChange={(e) => {
               const id = e.target.value
               setSelectedFileId(id)
+              latestSelection.current = id
               const file = uploadedFiles.find((f) => String(f.id) === id)
-              // Only overwrite the textarea when the file actually extracted
-              // something -- a scanned PDF with no text layer, for instance,
-              // extracts to '' and should leave whatever's already typed alone.
-              if (file?.text) {
-                setDocumentText(file.text)
+              if (!file) return
+              // undefined = loaded from Supabase without its text; a file
+              // uploaded this session already carries it.
+              if (file.text === undefined) {
+                loadDocumentText(file.id)
+              } else {
+                fillFromText(file.text)
               }
             }}
             disabled={uploadedFiles.length === 0}
