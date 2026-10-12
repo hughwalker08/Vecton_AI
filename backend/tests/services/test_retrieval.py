@@ -125,6 +125,12 @@ def test_rerank_returns_empty_list_without_calling_hf_for_no_candidates(monkeypa
     assert called == []
 
 
+@pytest.fixture(autouse=True)
+def _default_to_hf_backend(monkeypatch, backend_settings):
+    """backend/.env may set RERANKER_BACKEND=local; keep these tests hermetic."""
+    monkeypatch.setattr(backend_settings, "RERANKER_BACKEND", "hf")
+
+
 def test_rerank_raises_when_hf_token_not_configured(monkeypatch, backend_settings):
     monkeypatch.setattr(backend_settings, "HF_API_TOKEN", "")
 
@@ -245,7 +251,7 @@ def test_rerank_defaults_to_the_hosted_backend(monkeypatch, backend_settings):
     assert backend_settings.RERANKER_BACKEND == "hf"
     monkeypatch.setattr(backend_settings, "HF_API_TOKEN", "fake-token")
     monkeypatch.setattr(retrieval, "_local_scores", lambda *a, **k: pytest.fail("must not run locally"))
-    monkeypatch.setattr(httpx, "post", lambda *a, **k: _response(200, json_body=[[{"score": 0.4}]]))
+    monkeypatch.setattr(retrieval._http, "post", lambda *a, **k: _response(200, json_body=[[{"score": 0.4}]]))
 
     assert retrieval.rerank("q", [_candidate()])[0]["rerank_score"] == 0.4
 
@@ -253,7 +259,7 @@ def test_rerank_defaults_to_the_hosted_backend(monkeypatch, backend_settings):
 def test_rerank_local_backend_never_calls_hugging_face_or_needs_a_token(monkeypatch, backend_settings):
     monkeypatch.setattr(backend_settings, "RERANKER_BACKEND", "local")
     monkeypatch.setattr(backend_settings, "HF_API_TOKEN", "")
-    monkeypatch.setattr(httpx, "post", lambda *a, **k: pytest.fail("must not call the hosted API"))
+    monkeypatch.setattr(retrieval._http, "post", lambda *a, **k: pytest.fail("must not call the hosted API"))
     monkeypatch.setattr(retrieval, "_local_scores", lambda query, candidates: [0.2, 0.9])
 
     results = retrieval.rerank("q", [_candidate(clause_id="A"), _candidate(clause_id="B")])
