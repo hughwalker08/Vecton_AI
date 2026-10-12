@@ -3,7 +3,7 @@ Tests for app.services.retrieval.
 
 hybrid_search() hits a real Postgres connection and embed_text() -- both
 monkeypatched here rather than used for real (no DB, no Gemini calls).
-rerank() hits Hugging Face's Inference router via httpx -- also
+rerank() hits Hugging Face's Inference router via retrieval._http -- also
 monkeypatched. retrieve() is just hybrid_search() + rerank() glued
 together, so its own test monkeypatches both of those instead of going
 two layers deep.
@@ -119,7 +119,7 @@ def test_hybrid_search_returns_rows_as_plain_dicts(monkeypatch):
 
 def test_rerank_returns_empty_list_without_calling_hf_for_no_candidates(monkeypatch):
     called = []
-    monkeypatch.setattr(httpx, "post", lambda *a, **k: called.append(1))
+    monkeypatch.setattr(retrieval._http, "post", lambda *a, **k: called.append(1))
 
     assert retrieval.rerank("q", []) == []
     assert called == []
@@ -135,7 +135,7 @@ def test_rerank_raises_when_hf_token_not_configured(monkeypatch, backend_setting
 def test_rerank_scores_and_sorts_candidates_descending(monkeypatch, backend_settings):
     monkeypatch.setattr(backend_settings, "HF_API_TOKEN", "fake-token")
     monkeypatch.setattr(
-        httpx, "post",
+        retrieval._http, "post",
         lambda *a, **k: _response(200, json_body=[[{"score": 0.2}, {"score": 0.9}]]),
     )
     candidates = [_candidate(clause_id="A"), _candidate(clause_id="B")]
@@ -150,7 +150,7 @@ def test_rerank_truncates_to_top_n(monkeypatch, backend_settings):
     monkeypatch.setattr(backend_settings, "HF_API_TOKEN", "fake-token")
     scores = [0.1, 0.5, 0.9]
     monkeypatch.setattr(
-        httpx, "post",
+        retrieval._http, "post",
         lambda *a, **k: _response(200, json_body=[[{"score": s} for s in scores]]),
     )
     candidates = [_candidate(clause_id=str(i)) for i in range(3)]
@@ -164,7 +164,7 @@ def test_rerank_truncates_to_top_n(monkeypatch, backend_settings):
 def test_rerank_raises_quota_exceeded_on_429_with_retry_after(monkeypatch, backend_settings):
     monkeypatch.setattr(backend_settings, "HF_API_TOKEN", "fake-token")
     monkeypatch.setattr(
-        httpx, "post",
+        retrieval._http, "post",
         lambda *a, **k: _response(429, json_body={}, headers={"retry-after": "20"}),
     )
 
@@ -174,7 +174,7 @@ def test_rerank_raises_quota_exceeded_on_429_with_retry_after(monkeypatch, backe
 
 def test_rerank_raises_quota_exceeded_on_429_without_retry_after(monkeypatch, backend_settings):
     monkeypatch.setattr(backend_settings, "HF_API_TOKEN", "fake-token")
-    monkeypatch.setattr(httpx, "post", lambda *a, **k: _response(429, json_body={}))
+    monkeypatch.setattr(retrieval._http, "post", lambda *a, **k: _response(429, json_body={}))
 
     with pytest.raises(retrieval.QuotaExceededError):
         retrieval.rerank("q", [_candidate()])
@@ -182,7 +182,7 @@ def test_rerank_raises_quota_exceeded_on_429_without_retry_after(monkeypatch, ba
 
 def test_rerank_raises_rerank_error_on_other_http_status(monkeypatch, backend_settings):
     monkeypatch.setattr(backend_settings, "HF_API_TOKEN", "fake-token")
-    monkeypatch.setattr(httpx, "post", lambda *a, **k: _response(500, json_body={}))
+    monkeypatch.setattr(retrieval._http, "post", lambda *a, **k: _response(500, json_body={}))
 
     with pytest.raises(retrieval.RerankError):
         retrieval.rerank("q", [_candidate()])
@@ -194,7 +194,7 @@ def test_rerank_raises_rerank_error_on_network_failure(monkeypatch, backend_sett
     def _raise(*a, **k):
         raise httpx.ConnectError("connection refused")
 
-    monkeypatch.setattr(httpx, "post", _raise)
+    monkeypatch.setattr(retrieval._http, "post", _raise)
 
     with pytest.raises(retrieval.RerankError):
         retrieval.rerank("q", [_candidate()])
@@ -202,7 +202,7 @@ def test_rerank_raises_rerank_error_on_network_failure(monkeypatch, backend_sett
 
 def test_rerank_raises_on_malformed_response_shape(monkeypatch, backend_settings):
     monkeypatch.setattr(backend_settings, "HF_API_TOKEN", "fake-token")
-    monkeypatch.setattr(httpx, "post", lambda *a, **k: _response(200, json_body={"unexpected": True}))
+    monkeypatch.setattr(retrieval._http, "post", lambda *a, **k: _response(200, json_body={"unexpected": True}))
 
     with pytest.raises(retrieval.RerankError, match="Unexpected rerank response shape"):
         retrieval.rerank("q", [_candidate()])
@@ -210,7 +210,7 @@ def test_rerank_raises_on_malformed_response_shape(monkeypatch, backend_settings
 
 def test_rerank_raises_when_score_count_does_not_match_candidate_count(monkeypatch, backend_settings):
     monkeypatch.setattr(backend_settings, "HF_API_TOKEN", "fake-token")
-    monkeypatch.setattr(httpx, "post", lambda *a, **k: _response(200, json_body=[[{"score": 0.5}]]))
+    monkeypatch.setattr(retrieval._http, "post", lambda *a, **k: _response(200, json_body=[[{"score": 0.5}]]))
 
     with pytest.raises(retrieval.RerankError, match="2 candidates"):
         retrieval.rerank("q", [_candidate(), _candidate()])

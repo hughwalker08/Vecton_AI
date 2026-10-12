@@ -72,7 +72,9 @@ function mockSignedIn({ jurisdiction = 'NSW', email = 'jordan@example.com' } = {
     }
     if (table === 'conversations') {
       return {
-        select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        select: () => ({
+          eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        }),
         upsert: () => Promise.resolve({ error: null }),
       }
     }
@@ -86,7 +88,9 @@ function mockSignedIn({ jurisdiction = 'NSW', email = 'jordan@example.com' } = {
     }
     if (table === 'folders') {
       return {
-        select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        select: () => ({
+          eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        }),
         insert: () => Promise.resolve({ error: null }),
         update: () => ({ eq: () => Promise.resolve({ error: null }) }),
         delete: () => ({ eq: () => Promise.resolve({ error: null }) }),
@@ -94,7 +98,9 @@ function mockSignedIn({ jurisdiction = 'NSW', email = 'jordan@example.com' } = {
     }
     if (table === 'documents') {
       return {
-        select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        select: () => ({
+          eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        }),
         insert: () => Promise.resolve({ error: null }),
         update: () => ({ eq: () => Promise.resolve({ error: null }) }),
         delete: () => ({ eq: () => Promise.resolve({ error: null }) }),
@@ -102,7 +108,9 @@ function mockSignedIn({ jurisdiction = 'NSW', email = 'jordan@example.com' } = {
     }
     if (table === 'projects') {
       return {
-        select: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        select: () => ({
+          eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+        }),
         insert: () => Promise.resolve({ error: null }),
         update: () => ({ eq: () => Promise.resolve({ error: null }) }),
         delete: () => ({ eq: () => Promise.resolve({ error: null }) }),

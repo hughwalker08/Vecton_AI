@@ -20,6 +20,7 @@ vi.mock('../lib/supabase.js', () => ({
 }))
 
 import { uploadDocument } from '../api/client.js'
+import { supabase } from '../lib/supabase.js'
 
 function renderUploadPage(files = [], { folders = [] } = {}) {
   const setFiles = vi.fn()
@@ -175,6 +176,23 @@ describe('UploadPage', () => {
     fireEvent.change(screen.getByLabelText(/document \(optional\)/i), { target: { value: '1' } })
 
     expect(screen.getByLabelText('Document text')).toHaveValue('All footings are 300mm deep.')
+  })
+
+  it("fetches a loaded document's text on selection, since the list load leaves it out", async () => {
+    const eq = vi.fn(() => ({
+      maybeSingle: () => Promise.resolve({ data: { text: 'Stud spacing is 450mm.' }, error: null }),
+    }))
+    supabase.from.mockImplementationOnce(() => ({ select: () => ({ eq }) }))
+    renderUploadPage([
+      // No `text` key: how App.jsx's loadDocuments hands over a stored document.
+      { id: 7, name: 'frame.pdf', size: 1024, uploadedAt: new Date(), status: 'done', detail: 'processed' },
+    ])
+
+    fireEvent.change(screen.getByLabelText(/document \(optional\)/i), { target: { value: '7' } })
+
+    expect(supabase.from).toHaveBeenCalledWith('documents')
+    expect(eq).toHaveBeenCalledWith('id', 7)
+    expect(await screen.findByDisplayValue('Stud spacing is 450mm.')).toBe(screen.getByLabelText('Document text'))
   })
 
   it('does not clobber manually-typed text when the selected file extracted nothing', () => {

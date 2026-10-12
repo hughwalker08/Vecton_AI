@@ -160,6 +160,10 @@ def test_upgrade_to_head_then_downgrade_to_base_round_trips_cleanly(migration_te
     columns = {c["name"] for c in inspector.get_columns("clause_chunks", schema="public")}
     assert "text_tsv" in columns  # 0003
     assert "image_refs" in columns  # 0005
+    conversation_indexes = {
+        i["name"] for i in inspector.get_indexes("conversations", schema="public")
+    }
+    assert "ix_conversations_user_id_updated_at" in conversation_indexes  # 0011
 
     command.downgrade(cfg, "base")
     inspector.clear_cache()

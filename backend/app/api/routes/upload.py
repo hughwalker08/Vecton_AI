@@ -27,6 +27,7 @@ not wired up, and remains the plan for step 3/4's chunk-and-embed path.
 from __future__ import annotations
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from app.services.document_images import (
@@ -84,13 +85,17 @@ async def upload_document(
     ),
 ) -> UploadResponse:
     """Accept a PDF or DOCX, and transcribe the drawings inside it."""
+    # This handler is async (for the await on file.read()), so it runs on the
+    # event loop itself: anything blocking called inline here -- parsing a
+    # PDF, one vision-model call per image -- would freeze every other
+    # request on the server until it finished. Both go to the threadpool.
     filename = file.filename or "upload"
     data = await file.read()
     if not data:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
     try:
-        extracted_text = extract_text(data, filename)
+        extracted_text = await run_in_threadpool(extract_text, data, filename)
     except Exception as exc:  # noqa: BLE001 - wrong/corrupt/unreadable file
         raise HTTPException(
             status_code=400, detail=f"Could not extract text from {filename}: {exc}"
@@ -107,8 +112,8 @@ async def upload_document(
         return response
 
     try:
-        report = describe_document_images(
-            data, filename, max_images=max_images
+        report = await run_in_threadpool(
+            describe_document_images, data, filename, max_images=max_images
         )
     except DocumentImageError as exc:
         # Wrong file type, corrupt archive, or a missing extraction library.
