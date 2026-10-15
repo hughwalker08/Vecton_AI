@@ -165,3 +165,51 @@ def test_generate_answer_strips_whitespace_and_tolerates_empty_text(monkeypatch,
     _single_key_answer(monkeypatch, backend_settings, _fake_response(None))
     generation._clients.clear()
     assert generation.generate_answer("q", []) == ""
+
+
+_HISTORY = [
+    {"role": "user", "text": "What is the max riser height?"},
+    {"role": "assistant", "text": "220 mm."},
+]
+
+
+def _use_fake_gemini(monkeypatch, backend_settings, behaviour):
+    monkeypatch.setattr(backend_settings, "GEMINI_API_KEYS", "key1")
+    monkeypatch.setattr(
+        generation.genai, "Client", lambda api_key, http_options=None: _FakeClient(api_key, behaviour)
+    )
+
+
+def test_condense_question_returns_the_models_standalone_rewrite(monkeypatch, backend_settings):
+    _use_fake_gemini(
+        monkeypatch, backend_settings,
+        {"key1": _fake_response("  maximum riser height\nfor a spiral stair ")},
+    )
+
+    result = generation.condense_question("What about for a spiral stair?", _HISTORY)
+
+    assert result == "maximum riser height for a spiral stair"
+
+
+def test_condense_question_skips_the_model_without_history(monkeypatch, backend_settings):
+    _use_fake_gemini(monkeypatch, backend_settings, {"key1": RuntimeError("must not be called")})
+
+    assert generation.condense_question("What is the max riser height?", []) == (
+        "What is the max riser height?"
+    )
+    assert generation.condense_question("What is the max riser height?", None) == (
+        "What is the max riser height?"
+    )
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    [_quota_error(), RuntimeError("boom"), _fake_response(""), _fake_response("x" * 1000)],
+    ids=["quota", "error", "empty", "runaway"],
+)
+def test_condense_question_falls_back_to_the_raw_question(monkeypatch, backend_settings, outcome):
+    _use_fake_gemini(monkeypatch, backend_settings, {"key1": outcome})
+
+    assert generation.condense_question("What about for a spiral stair?", _HISTORY) == (
+        "What about for a spiral stair?"
+    )
