@@ -6,7 +6,15 @@ are imported by name into app.api.routes.chat's own namespace, so they're
 monkeypatched there directly -- no real Gemini/DB calls happen in this file.
 """
 
+import pytest
+
 from app.api.routes import chat
+
+
+@pytest.fixture(autouse=True)
+def _no_real_condense(monkeypatch):
+    """Never let a route test reach Gemini for query condensation."""
+    monkeypatch.setattr(chat, "condense_question", lambda question, history: question)
 
 
 def _chunk(**overrides):
@@ -322,3 +330,32 @@ def test_citations_from_skips_chunks_with_no_clause_id():
 
     assert len(citations) == 1
     assert citations[0].clause_id == "H1D4"
+
+
+def test_ask_question_retrieves_on_the_condensed_query_but_answers_the_original(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        chat, "condense_question", lambda q, h: "maximum riser height for a spiral stair"
+    )
+    monkeypatch.setattr(
+        chat, "retrieve", lambda query, **k: seen.update(query=query) or [_chunk()]
+    )
+    monkeypatch.setattr(
+        chat, "generate_answer", lambda question, *a, **k: seen.update(question=question) or "ok"
+    )
+
+    response = client.post(
+        "/api/chat/",
+        json={
+            "question": "What about for a spiral stair?",
+            "jurisdiction": "NSW",
+            "history": [
+                {"role": "user", "text": "What is the max riser height?"},
+                {"role": "assistant", "text": "220 mm."},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert seen["query"] == "maximum riser height for a spiral stair"
+    assert seen["question"] == "What about for a spiral stair?"

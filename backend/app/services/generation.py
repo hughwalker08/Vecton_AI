@@ -258,6 +258,54 @@ def _history_contents(history: list[dict] | None) -> list[types.Content]:
     ]
 
 
+_CONDENSE_INSTRUCTION = """You rewrite a follow-up question from a building-code chat into one \
+standalone search query. Use the conversation to resolve references ("it", "that", "what about \
+for X"), keeping the topic and any measurements or building classes already established. \
+If the question already stands on its own, return it unchanged. Output only the rewritten \
+query on one line -- no quotes, no explanation, and do not answer it."""
+
+# A condensed query is a short search string; anything much longer means the
+# model answered or rambled instead, so the raw question is safer.
+_MAX_CONDENSED_CHARS = 400
+
+
+def condense_question(question: str, history: list[dict] | None) -> str:
+    """Rewrite a follow-up into a standalone retrieval query using `history`.
+
+    Retrieval searches on this string only, so "What about for a spiral
+    stair?" would otherwise be embedded with no mention of riser heights.
+    Best-effort: with no history, or on any failure (quota, API error, empty
+    or runaway output), returns `question` unchanged so retrieval behaves as
+    it did before.
+    """
+    if not history or not settings.gemini_api_keys:
+        return question
+    contents = _history_contents(history) + [
+        types.Content(role="user", parts=[types.Part(text=f"Follow-up question: {question}")])
+    ]
+
+    def _call(key: str):
+        return _client_for(key).models.generate_content(
+            model=settings.LLM_MODEL_NAME,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=_CONDENSE_INSTRUCTION,
+                temperature=0,
+                max_output_tokens=_MAX_OUTPUT_TOKENS,
+                thinking_config=_THINKING_CONFIG,
+            ),
+        )
+
+    try:
+        response = call_with_rotation(_is_quota_error, _call)
+        condensed = " ".join((response.text or "").split())
+    except Exception:
+        return question
+    if not condensed or len(condensed) > _MAX_CONDENSED_CHARS:
+        return question
+    return condensed
+
+
 def generate_answer(
     question: str,
     chunks: list[dict],
@@ -275,8 +323,8 @@ def generate_answer(
     `history` is prior conversation turns, oldest first, each
     {"role": "user"|"assistant", "text": str} -- the plain question/answer
     text as shown in the chat UI, not the retrieval internals. Only the most
-    recent MAX_HISTORY_MESSAGES are replayed; retrieval itself (see
-    api/routes/chat.py) does not use history, only the raw current question.
+    recent MAX_HISTORY_MESSAGES are replayed; retrieval searches on
+    condense_question()'s standalone rewrite of the current question.
 
     `attachment_text`, when given, is a document the user attached to the
     chat (see api/routes/chat.py) -- a second source, folded into both the
