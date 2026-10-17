@@ -22,9 +22,9 @@ Multi-turn: the caller sends prior conversation turns as `history` on each
 request. This backend itself is stateless -- it has no conversation
 storage of its own -- but the frontend persists the chat transcript
 directly to Supabase (see migration 0007) so it survives a refresh; that
-happens independently of this endpoint. Retrieval only ever searches on the
-current question; history is used for generation only, see
-generation.py's module docstring for why.
+happens independently of this endpoint. Retrieval searches on the current question, rewritten into a standalone
+query from history when there is any (generation.condense_question); history
+is also replayed to generation, see generation.py's module docstring.
 
 A user can also attach one document to a chat (`attachment_name` /
 `attachment_text`, extracted client-side by services/document_text.py via
@@ -41,7 +41,7 @@ from pydantic import BaseModel
 
 from app.services.embedding import EmbeddingError
 from app.services.embedding import QuotaExceededError as EmbeddingQuotaExceeded
-from app.services.generation import GenerationError, generate_answer
+from app.services.generation import GenerationError, condense_question, generate_answer
 from app.services.generation import QuotaExceededError as GenerationQuotaExceeded
 from app.services.glossary import definitions_for
 from app.services.retrieval import QuotaExceededError as RerankQuotaExceeded
@@ -170,8 +170,11 @@ def ask_question(request: ChatRequest) -> ChatResponse:
     if not question:
         raise HTTPException(status_code=400, detail="Question must not be empty.")
 
+    history = [{"role": turn.role, "text": turn.text} for turn in request.history]
+    search_query = condense_question(question, history)
+
     try:
-        chunks = retrieve(question, top_k=RETRIEVAL_TOP_K, jurisdiction=request.jurisdiction)
+        chunks = retrieve(search_query, top_k=RETRIEVAL_TOP_K, jurisdiction=request.jurisdiction)
     except (EmbeddingQuotaExceeded, RerankQuotaExceeded) as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
     except (EmbeddingError, RerankError) as exc:

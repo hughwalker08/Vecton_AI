@@ -6,8 +6,16 @@ are imported by name into app.api.routes.chat's own namespace, so they're
 monkeypatched there directly -- no real Gemini/DB calls happen in this file.
 """
 
+import pytest
+
 from app.api.routes import chat
 from app.services import glossary
+
+
+@pytest.fixture(autouse=True)
+def _no_real_condense(monkeypatch):
+    """Never let a route test reach Gemini for query condensation."""
+    monkeypatch.setattr(chat, "condense_question", lambda question, history: question)
 
 
 def _chunk(**overrides):
