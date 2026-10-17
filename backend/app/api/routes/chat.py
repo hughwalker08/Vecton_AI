@@ -43,6 +43,7 @@ from app.services.embedding import EmbeddingError
 from app.services.embedding import QuotaExceededError as EmbeddingQuotaExceeded
 from app.services.generation import GenerationError, condense_question, generate_answer
 from app.services.generation import QuotaExceededError as GenerationQuotaExceeded
+from app.services.glossary import definitions_for
 from app.services.retrieval import QuotaExceededError as RerankQuotaExceeded
 from app.services.retrieval import RerankError, retrieve
 
@@ -57,6 +58,12 @@ RETRIEVAL_TOP_K = 8
 # clearly-irrelevant text ~0.00004 in manual testing; this is a first cut and
 # worth revisiting once there's real query traffic to calibrate against.
 MIN_RERANK_SCORE = 0.1
+
+# ABCB Housing Provisions' "x.y" parts are section headers -- their text is
+# just the title (part "10.3" is "Room heights"), so they never become
+# citations. NCC parts (A1, H1, ...) carry a real summary and stay citable.
+# Uncited chunks still go to the LLM as context; only the source list skips them.
+_UNCITED_PART_DOCS = {"ABCB Housing Provisions"}
 
 
 Jurisdiction = Literal[
@@ -115,13 +122,29 @@ class ChatResponse(BaseModel):
     abstained: bool = False
 
 
+def _is_citable(chunk: dict) -> bool:
+    """False for header chunks with nothing to read: ABCB parts, and any
+    chunk whose text is empty or just repeats its heading's title (e.g. NCC
+    Specification 42, heading "42 House energy rating software")."""
+    if chunk.get("node_type") == "part" and chunk.get("doc") in _UNCITED_PART_DOCS:
+        return False
+    text = (chunk.get("text") or "").strip()
+    title = (chunk.get("heading") or "").removeprefix(chunk.get("clause_id") or "").strip()
+    return bool(text) and text != title
+
+
 def _citations_from(chunks: list[dict]) -> list[Citation]:
-    """One Citation per distinct (clause_id, doc), in relevance order."""
+    """One Citation per distinct (clause_id, doc), in relevance order,
+    skipping chunks _is_citable() rejects."""
     seen: set[tuple[str, str | None]] = set()
     citations = []
     for chunk in chunks:
         clause_id, doc = chunk.get("clause_id"), chunk.get("doc")
         if not clause_id or (clause_id, doc) in seen:
+            continue
+        # Checked before marking (clause_id, doc) seen, so a header chunk
+        # can't shadow a later, real chunk for the same clause.
+        if not _is_citable(chunk):
             continue
         seen.add((clause_id, doc))
         citations.append(
@@ -171,6 +194,11 @@ def ask_question(request: ChatRequest) -> ChatResponse:
         return ChatResponse(answer="No source found.", citations=[], abstained=True)
 
     context_chunks = chunks if strong_match else []
+    # Glossary entries never come back from retrieve(); the definitions the
+    # context relies on are looked up here instead (see services/glossary.py).
+    # They're prompt-only: never chunks, so never citations either.
+    definitions = definitions_for(context_chunks, question) if context_chunks else []
+    history = [{"role": turn.role, "text": turn.text} for turn in request.history]
 
     try:
         answer = generate_answer(
@@ -180,6 +208,7 @@ def ask_question(request: ChatRequest) -> ChatResponse:
             history=history,
             attachment_name=request.attachment_name,
             attachment_text=request.attachment_text,
+            definitions=definitions,
         )
     except GenerationQuotaExceeded as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc

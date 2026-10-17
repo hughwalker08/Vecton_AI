@@ -80,11 +80,18 @@ _JURISDICTION_CLAUSE = """
             OR :jurisdiction = ANY(jurisdictions)
         )"""
 
+# Glossary entries are never search candidates -- many are a bare phrase
+# ("Alternating Current") that crowds real clauses out of the rerank pool.
+# Their definitions are attached after retrieval instead, from the final
+# chunks' defined_terms (see services/glossary.py).
+_NOT_GLOSSARY_CLAUSE = """
+        AND node_type <> 'glossary'"""
+
 _SEARCH_SQL = f"""
     WITH dense AS (
         SELECT id, row_number() OVER (ORDER BY embedding <=> :qvec) AS rank
         FROM clause_chunks
-        WHERE embedding IS NOT NULL{_JURISDICTION_CLAUSE}
+        WHERE embedding IS NOT NULL{_NOT_GLOSSARY_CLAUSE}{_JURISDICTION_CLAUSE}
         ORDER BY embedding <=> :qvec
         LIMIT :pool
     ),
@@ -93,7 +100,7 @@ _SEARCH_SQL = f"""
             ORDER BY ts_rank_cd(text_tsv, plainto_tsquery('english', :q)) DESC
         ) AS rank
         FROM clause_chunks
-        WHERE text_tsv @@ plainto_tsquery('english', :q){_JURISDICTION_CLAUSE}
+        WHERE text_tsv @@ plainto_tsquery('english', :q){_NOT_GLOSSARY_CLAUSE}{_JURISDICTION_CLAUSE}
         ORDER BY ts_rank_cd(text_tsv, plainto_tsquery('english', :q)) DESC
         LIMIT :pool
     ),
@@ -103,9 +110,9 @@ _SEARCH_SQL = f"""
         GROUP BY id
     )
     SELECT
-        c.clause_id, c.doc, c.heading, c.text, c.source_url,
+        c.clause_id, c.doc, c.node_type, c.heading, c.text, c.source_url,
         c.building_classes, c.jurisdictions, c.climate_zones,
-        c.applicability_note, c.standard_refs,
+        c.applicability_note, c.standard_refs, c.defined_terms,
         f.score AS fused_score
     FROM fused f
     JOIN clause_chunks c ON c.id = f.id
@@ -123,7 +130,10 @@ def hybrid_search(query: str, top_k: int = 10, jurisdiction: str | None = None) 
 
     Each result is shaped for app.services.generation._format_chunk (clause_id,
     doc, heading, text, building_classes, jurisdictions, climate_zones,
-    applicability_note, standard_refs), plus a `fused_score` for debugging.
+    applicability_note, standard_refs), plus `defined_terms` for the glossary
+    lookup, `node_type` for api/routes/chat.py's citation filter, and a
+    `fused_score` for debugging. Glossary entries are never
+    returned (see _NOT_GLOSSARY_CLAUSE).
     """
     from sqlalchemy import text as sql_text
 

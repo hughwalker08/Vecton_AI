@@ -79,6 +79,11 @@ If no CONTEXT is provided, or the context does not cover the question, say so pl
 of answering from general knowledge. Never fall back on general model knowledge — no statement \
 without a source: not "as a general principle", not "typically", not as helpful background.
 
+CONTEXT may be followed by DEFINITIONS: NCC Schedule 1 definitions of terms the clauses or the \
+question use. Use them to interpret the clauses, since a defined term carries that meaning \
+rather than its everyday one. When a definition matters to the answer, attribute it as an NCC \
+Schedule 1 definition of that term rather than as a clause.
+
 Be simple, clear and concise.
 
 Formatting: light Markdown only, limited to exactly what the chat UI renders -- nothing else is \
@@ -136,7 +141,7 @@ _RETRY_OPTIONS = types.HttpRetryOptions(
     exp_base=2,
     http_status_codes=[429, 500, 502, 503, 504],
 )
-_HTTP_OPTIONS = types.HttpOptions(timeout=30_000, retry_options=_RETRY_OPTIONS)
+_HTTP_OPTIONS = types.HttpOptions(timeout=60_000, retry_options=_RETRY_OPTIONS)
 
 # gemini-3.x models spend part of max_output_tokens on internal "thinking"
 # before writing the visible answer -- a real answer observed spending 1964
@@ -214,14 +219,22 @@ def _format_chunk(chunk: dict) -> str:
     return "\n".join(lines)
 
 
+def _format_definitions(definitions: list[dict]) -> str:
+    """Render glossary definitions (see services/glossary.py) one per line."""
+    return "\n".join(f"{d['term']}: {d['definition']}" for d in definitions)
+
+
 def _build_user_content(
     question: str,
     chunks: list[dict],
     attachment_name: str | None = None,
     attachment_text: str | None = None,
+    definitions: list[dict] | None = None,
 ) -> str:
     context_block = "\n\n".join(_format_chunk(c) for c in chunks) if chunks else "(none retrieved)"
     parts = [f"CONTEXT:\n{context_block}"]
+    if definitions:
+        parts.append(f"DEFINITIONS:\n{_format_definitions(definitions)}")
     if attachment_text:
         parts.append(f"ATTACHED DOCUMENT ({attachment_name}):\n{attachment_text}")
     parts.append(f"QUESTION: {question}")
@@ -313,6 +326,7 @@ def generate_answer(
     history: list[dict] | None = None,
     attachment_name: str | None = None,
     attachment_text: str | None = None,
+    definitions: list[dict] | None = None,
 ) -> str:
     """Return an LLM-generated answer for the question, grounded in `chunks`.
 
@@ -330,6 +344,10 @@ def generate_answer(
     chat (see api/routes/chat.py) -- a second source, folded into both the
     user content and the system instruction so the model treats it as
     project evidence rather than a corpus citation.
+
+    `definitions` are NCC glossary entries ({"term", "definition"}) for the
+    terms `chunks` and the question use -- see services/glossary.py. They go
+    in their own block after CONTEXT, never as chunks.
     """
     if not settings.gemini_api_keys:
         raise GenerationError(
@@ -338,7 +356,9 @@ def generate_answer(
         )
     attachment_text = (attachment_text or "").strip() or None
     attachment_label = (attachment_name or "the attached document") if attachment_text else None
-    user_content = _build_user_content(question, chunks, attachment_label, attachment_text)
+    user_content = _build_user_content(
+        question, chunks, attachment_label, attachment_text, definitions
+    )
     contents = _history_contents(history) + [
         types.Content(role="user", parts=[types.Part(text=user_content)])
     ]
