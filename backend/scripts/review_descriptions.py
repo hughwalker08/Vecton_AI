@@ -53,7 +53,7 @@ CORPORA = {
     "vol2": ("NCC 2025 Volume Two", OUTPUT_DIR / "vol2_image_descriptions.jsonl"),
     "housing": ("ABCB Housing Provisions", OUTPUT_DIR / "housing_image_descriptions.jsonl"),
 }
-GROUPS = ("a", "b")
+GROUPS = ("a", "b", "c")
 
 _MIME = {
     ".html": "text/html; charset=utf-8",
@@ -108,20 +108,169 @@ def load_all_items() -> list[dict]:
     return items
 
 
-def split_groups(items: list[dict]) -> dict[str, list[dict]]:
-    """Deal items alternately into the two groups.
-
-    Alternating rather than halving keeps each reviewer's mix of corpora the
-    same; a straight cut would hand one person every Volume Two figure.
-    """
-    return {
-        "a": [it for i, it in enumerate(items) if i % 2 == 0],
-        "b": [it for i, it in enumerate(items) if i % 2 == 1],
-    }
+def assignments_path() -> Path:
+    return REVIEW_DIR / "assignments.json"
 
 
 def review_path(group: str) -> Path:
     return REVIEW_DIR / f"group-{group}.json"
+
+
+def load_pinned(valid_keys: set[str]) -> dict[str, str]:
+    """Figure -> group, for every figure that already carries a verdict.
+
+    Read from whatever `group-*.json` files are on this machine. A reviewed
+    figure must never move: moving it would either lose the verdict or hand
+    the same drawing to a second person.
+
+    The review files are per-reviewer and are not committed, so this only
+    sees the ones present locally -- `rebalance` warns about any group whose
+    file is missing, because its verdicts cannot be honoured from here.
+    """
+    pinned: dict[str, str] = {}
+    for path in sorted(REVIEW_DIR.glob("group-*.json")):
+        group = path.stem.split("-", 1)[1]
+        if group not in GROUPS:
+            continue
+        try:
+            state = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for key, entry in (state.get("results") or {}).items():
+            if entry.get("verdict") and key in valid_keys:
+                pinned[key] = group
+    return pinned
+
+
+def compute_assignments(items: list[dict], pinned: dict[str, str],
+                        groups: tuple[str, ...]) -> dict[str, str]:
+    """Spread every figure across `groups`, leaving reviewed ones where they are.
+
+    Balanced per corpus rather than over the whole set: with 30 Volume Two
+    and 240 Housing Provisions figures, dealing the combined list would let
+    one reviewer end up with most of the Volume Two drawings. Each corpus is
+    dealt separately so everyone sees roughly the same mix.
+
+    Unreviewed figures go to whichever group is furthest below its share,
+    with ties broken by group letter, so the result is deterministic -- the
+    same inputs always produce the same assignment.
+    """
+    corpus_of = {it["key"]: it["corpus"] for it in items}
+    assignments = {k: g for k, g in pinned.items() if k in corpus_of}
+
+    for corpus in sorted({it["corpus"] for it in items}):
+        keys = sorted(k for k, c in corpus_of.items() if c == corpus)
+        held = {g: sum(1 for k in keys if assignments.get(k) == g) for g in groups}
+
+        # Even shares, with any remainder going to the earliest groups.
+        base, extra = divmod(len(keys), len(groups))
+        target = {g: base + (1 if i < extra else 0) for i, g in enumerate(groups)}
+
+        for key in keys:
+            if key in assignments:
+                continue
+            # Largest shortfall first; ties by group order. Once every group
+            # has met its target (possible when a group was already over it),
+            # fall back to whoever holds the fewest.
+            chosen = min(
+                groups,
+                key=lambda g: (-(target[g] - held[g]), groups.index(g)),
+            )
+            assignments[key] = chosen
+            held[chosen] += 1
+
+    return assignments
+
+
+def load_assignments(items: list[dict]) -> dict[str, str]:
+    """The stored assignment, extended if new figures have appeared.
+
+    `assignments.json` is the shared source of truth and is committed, so all
+    three reviewers agree on who has what. Regenerating it on the fly would
+    let two machines disagree.
+    """
+    keys = {it["key"] for it in items}
+    stored: dict[str, str] = {}
+    path = assignments_path()
+    if path.exists():
+        data = json.loads(path.read_text(encoding="utf-8"))
+        stored = {k: g for k, g in (data.get("assignments") or {}).items()
+                  if k in keys and g in GROUPS}
+
+    if len(stored) == len(keys):
+        return stored
+
+    # First run, or figures added since. Keep what is there, place the rest.
+    pinned = dict(stored)
+    pinned.update(load_pinned(keys))
+    assignments = compute_assignments(items, pinned, GROUPS)
+    write_assignments(items, assignments, note="auto-generated: no manifest, or new figures appeared")
+    return assignments
+
+
+def write_assignments(items: list[dict], assignments: dict[str, str], note: str = "") -> Path:
+    REVIEW_DIR.mkdir(parents=True, exist_ok=True)
+    counts: dict[str, dict[str, int]] = {}
+    for it in items:
+        group = assignments.get(it["key"])
+        if group is None:
+            continue
+        bucket = counts.setdefault(group, {"total": 0})
+        bucket["total"] += 1
+        bucket[it["corpus"]] = bucket.get(it["corpus"], 0) + 1
+
+    payload = {
+        "groups": list(GROUPS),
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "note": note,
+        "total": len(items),
+        "counts": {g: counts.get(g, {"total": 0}) for g in GROUPS},
+        "assignments": dict(sorted(assignments.items())),
+    }
+    path = assignments_path()
+    temp = path.with_suffix(".json.tmp")
+    temp.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    temp.replace(path)
+    return path
+
+
+def group_items(items: list[dict], assignments: dict[str, str], group: str) -> list[dict]:
+    return [it for it in items if assignments.get(it["key"]) == group]
+
+
+def rebalance(items: list[dict]) -> int:
+    """Recompute the split across all GROUPS, leaving reviewed figures put."""
+    keys = {it["key"] for it in items}
+    before = load_assignments(items) if assignments_path().exists() else {}
+    pinned = load_pinned(keys)
+
+    missing = [g for g in GROUPS if not review_path(g).exists()]
+    assignments = compute_assignments(items, pinned, GROUPS)
+    path = write_assignments(items, assignments, note=f"rebalanced across {len(GROUPS)} groups")
+
+    print(f"\n  {len(items)} figures across {len(GROUPS)} groups")
+    print(f"  {len(pinned)} already reviewed and pinned to their current group\n")
+    print(f"    {'group':6s} {'figures':>8s} {'pinned':>7s} {'moved in':>9s}   corpus mix")
+    for g in GROUPS:
+        mine = [k for k, gg in assignments.items() if gg == g]
+        held = sum(1 for k in mine if pinned.get(k) == g)
+        moved = sum(1 for k in mine if before.get(k) not in (None, g))
+        mix = {}
+        for it in items:
+            if assignments.get(it["key"]) == g:
+                mix[it["corpus"]] = mix.get(it["corpus"], 0) + 1
+        mix_text = ", ".join(f"{c} {n}" for c, n in sorted(mix.items()))
+        print(f"    {g:6s} {len(mine):8d} {held:7d} {moved:9d}   {mix_text}")
+
+    if missing:
+        print(f"\n  ! No review file for group(s): {', '.join(missing)}")
+        print("    Verdicts recorded on another machine cannot be seen from here, so")
+        print("    they were NOT pinned. If that reviewer has started, copy their")
+        print(f"    {REVIEW_DIR.name}/group-<x>.json here and re-run --rebalance.")
+
+    print(f"\n  written: {path}")
+    print("  Commit it so every reviewer works from the same split.\n")
+    return 0
 
 
 def load_review(group: str, group_items: list[dict], reviewer: str | None) -> dict:
@@ -265,44 +414,60 @@ def build_handler(group: str, group_items: list[dict], state: dict):
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--group", choices=GROUPS, required=True, help="which half to review")
+    parser.add_argument("--group", choices=GROUPS, help="which share to review")
     parser.add_argument("--reviewer", default=None, help="name recorded in the output file")
     parser.add_argument("--port", type=int, default=8900)
     parser.add_argument("--no-browser", action="store_true", help="don't open a browser")
     parser.add_argument("--summary", action="store_true",
-                        help="print both groups' progress and exit, without serving")
+                        help="print every group's progress and exit, without serving")
+    parser.add_argument("--rebalance", action="store_true",
+                        help="recompute the split across all groups and rewrite "
+                             "data/review/assignments.json. Figures that already have a "
+                             "verdict stay in the group that reviewed them.")
     args = parser.parse_args(argv)
 
     items = load_all_items()
-    groups = split_groups(items)
+
+    if args.rebalance:
+        return rebalance(items)
+
+    assignments = load_assignments(items)
 
     if args.summary:
-        print(f"\n{len(items)} figures total\n")
+        print(f"\n{len(items)} figures total across {len(GROUPS)} groups\n")
         for name in GROUPS:
+            mine = group_items(items, assignments, name)
             path = review_path(name)
             state = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
             results = state.get("results", {})
             done = sum(1 for r in results.values() if r.get("verdict"))
             bad = sum(1 for r in results.values() if r.get("verdict") == "incorrect")
             who = state.get("reviewer") or "unassigned"
-            print(f"  group {name}: {len(groups[name])} figures, {done} reviewed, "
+            print(f"  group {name}: {len(mine)} figures, {done} reviewed, "
                   f"{bad} incorrect, reviewer: {who}")
             print(f"            {path}" + ("" if path.exists() else "  (not started)"))
         print()
         return 0
 
-    group_items = groups[args.group]
-    state = load_review(args.group, group_items, args.reviewer)
+    if not args.group:
+        parser.error("--group is required unless using --summary or --rebalance")
+
+    mine = group_items(items, assignments, args.group)
+    if not mine:
+        print(f"Group {args.group} has no figures assigned. Run --rebalance first.",
+              file=sys.stderr)
+        return 1
+    state = load_review(args.group, mine, args.reviewer)
     write_review(args.group, state)   # make the file exist immediately
 
-    handler = build_handler(args.group, group_items, state)
+    handler = build_handler(args.group, mine, state)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
     url = f"http://127.0.0.1:{args.port}/"
 
     done = state.get("reviewed", 0)
     print()
     print(f"  Figure review - group {args.group.upper()}")
-    print(f"    figures : {len(group_items)}  ({done} already reviewed)")
+    print(f"    figures : {len(mine)}  ({done} already reviewed)")
     print(f"    saving  : {review_path(args.group)}")
     print(f"    open    : {url}")
     print()
@@ -320,7 +485,7 @@ def main(argv=None) -> int:
     finally:
         server.server_close()
         with_state = state.get("reviewed", 0)
-        print(f"  {with_state}/{len(group_items)} reviewed -> {review_path(args.group)}")
+        print(f"  {with_state}/{len(mine)} reviewed -> {review_path(args.group)}")
     return 0
 
 
