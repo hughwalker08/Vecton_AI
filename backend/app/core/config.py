@@ -48,7 +48,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEYS: str = ""
     # gemini-2.5-flash was retired for new API keys (404 from Google as of
     # 2026-09); gemini-3.6-flash is Google's recommended direct replacement.
-    LLM_MODEL_NAME: str = "gemini-3.6-flash"
+    LLM_MODEL_NAME: str = "gemini-3.8-flash"
 
     # --- Vision model for describing NCC/ABCB diagrams and figures ---
     # Used by services/image_description.py and scripts/describe_images.py.

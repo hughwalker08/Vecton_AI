@@ -99,6 +99,23 @@ def test_build_user_content_with_no_chunks_says_none_retrieved():
     assert "(none retrieved)" in content
 
 
+def test_build_user_content_without_definitions_has_no_definitions_block():
+    content = gen._build_user_content("A question", [_chunk()])
+
+    assert "DEFINITIONS:" not in content
+
+
+def test_build_user_content_puts_definitions_between_context_and_question():
+    content = gen._build_user_content(
+        "What counts as a habitable room?",
+        [_chunk()],
+        definitions=[{"term": "Habitable room", "definition": "A room used for normal domestic activities."}],
+    )
+
+    assert "DEFINITIONS:\nHabitable room: A room used for normal domestic activities." in content
+    assert content.index("CONTEXT:") < content.index("DEFINITIONS:") < content.index("QUESTION:")
+
+
 def test_build_system_instruction_without_extras_is_the_base_instruction():
     instruction = gen._build_system_instruction(None)
 

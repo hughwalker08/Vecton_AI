@@ -34,6 +34,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.core.config import settings
 from app.services.gemini_keys import call_with_rotation, quota_wait_hint
+from app.services.glossary import definitions_for
 from app.services.retrieval import retrieve
 
 Status = Literal["addressed", "missing", "contradicted", "needs_review"]
@@ -61,6 +62,9 @@ Rules:
 clause_id that wasn't given to you.
   - Base every classification only on the DOCUMENT text and the REQUIREMENT text -- never on \
 general knowledge of the NCC or construction practice.
+  - DEFINITIONS, when given, are NCC Schedule 1 definitions of terms the REQUIREMENT clauses \
+use. A defined term in a requirement carries that meaning, not its everyday one -- read the \
+requirement with it. Definitions are not clauses: never classify one.
   - "evidence" must be a short verbatim quote from the DOCUMENT supporting the classification, or \
 null when nothing in the document addresses it (i.e. for "missing").
   - "explanation" is one or two plain sentences saying why, tied to the requirement's actual \
@@ -207,12 +211,21 @@ def _format_requirement(chunk: dict) -> str:
     return "\n".join(lines)
 
 
-def _build_user_content(document_text: str, chunks: list[dict]) -> str:
+def _build_user_content(
+    document_text: str, chunks: list[dict], definitions: list[dict] | None = None
+) -> str:
     requirements_block = "\n\n".join(_format_requirement(c) for c in chunks)
-    return f"REQUIREMENTS:\n{requirements_block}\n\nDOCUMENT:\n{document_text}"
+    parts = [f"REQUIREMENTS:\n{requirements_block}"]
+    if definitions:
+        lines = "\n".join(f"{d['term']}: {d['definition']}" for d in definitions)
+        parts.append(f"DEFINITIONS:\n{lines}")
+    parts.append(f"DOCUMENT:\n{document_text}")
+    return "\n\n".join(parts)
 
 
-def _classify(document_text: str, chunks: list[dict]) -> dict[str, _FindingLLM]:
+def _classify(
+    document_text: str, chunks: list[dict], definitions: list[dict] | None = None
+) -> dict[str, _FindingLLM]:
     """Ask Gemini to classify every clause in `chunks` against `document_text`.
 
     Returns the results keyed by clause_id; a clause the model didn't return
@@ -224,7 +237,7 @@ def _classify(document_text: str, chunks: list[dict]) -> dict[str, _FindingLLM]:
             "GEMINI_API_KEY is not set. Copy backend/.env.example to backend/.env "
             "and fill it in (or export GEMINI_API_KEY / GEMINI_API_KEYS)."
         )
-    user_content = _build_user_content(document_text, chunks)
+    user_content = _build_user_content(document_text, chunks, definitions)
 
     def _call(key: str):
         client = _client_for(key)
@@ -308,7 +321,9 @@ def analyse_document(
     if not chunks:
         return report
 
-    by_clause_id = _classify(document_text, chunks)
+    # Glossary entries never come back from retrieve(); attach the definitions
+    # these clauses rely on instead (see services/glossary.py).
+    by_clause_id = _classify(document_text, chunks, definitions_for(chunks, query))
 
     for chunk in chunks:
         clause_id = chunk.get("clause_id")

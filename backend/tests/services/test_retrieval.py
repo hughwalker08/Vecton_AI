@@ -117,6 +117,15 @@ def test_hybrid_search_returns_rows_as_plain_dicts(monkeypatch):
     assert results == [row]
 
 
+def test_search_sql_excludes_glossary_entries_from_both_searches():
+    # Once in the dense CTE and once in the lexical one.
+    assert retrieval._SEARCH_SQL.count("node_type <> 'glossary'") == 2
+
+
+def test_search_sql_returns_defined_terms_for_the_glossary_lookup():
+    assert "c.defined_terms" in retrieval._SEARCH_SQL
+
+
 def test_rerank_returns_empty_list_without_calling_hf_for_no_candidates(monkeypatch):
     called = []
     monkeypatch.setattr(retrieval._http, "post", lambda *a, **k: called.append(1))

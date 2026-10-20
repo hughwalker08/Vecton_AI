@@ -16,6 +16,7 @@ from google.genai import errors as genai_errors
 
 from app.core.config import settings
 from app.services import compliance_analysis as ca
+from app.services import glossary
 
 
 def _chunk(**overrides):
@@ -47,7 +48,7 @@ def test_analyse_document_dedupes_chunks_sharing_a_clause_id(monkeypatch):
     monkeypatch.setattr(ca, "retrieve", lambda *a, **k: [_chunk(), _chunk()])
     seen_chunks = []
 
-    def _classify(document_text, chunks):
+    def _classify(document_text, chunks, definitions=None):
         seen_chunks.extend(chunks)
         return {
             "H1D4": ca._FindingLLM(clause_id="H1D4", status="addressed", explanation="x")
@@ -179,6 +180,41 @@ def test_build_user_content_includes_every_requirement_and_the_document_text():
     assert "H1D4" in content
     assert "H1D5" in content
     assert "DOCUMENT:\nFootings: 600mm deep." in content
+
+
+def test_build_user_content_adds_definitions_before_the_document():
+    content = ca._build_user_content(
+        "Footings: 600mm deep.",
+        [_chunk()],
+        [{"term": "Footing", "definition": "The construction that transfers loads to the foundation."}],
+    )
+
+    assert "DEFINITIONS:\nFooting: The construction that transfers loads to the foundation." in content
+    assert content.index("DEFINITIONS:") < content.index("DOCUMENT:")
+
+
+def test_build_user_content_without_definitions_has_no_definitions_block():
+    content = ca._build_user_content("Footings: 600mm deep.", [_chunk()])
+
+    assert "DEFINITIONS:" not in content
+
+
+def test_analyse_document_passes_the_clauses_definitions_to_classify(monkeypatch):
+    monkeypatch.setattr(ca, "retrieve", lambda *a, **k: [_chunk(defined_terms=["Footing"])])
+    glossary._set_terms({"Footing": "The construction that transfers loads."})
+    seen = {}
+
+    def _classify(document_text, chunks, definitions=None):
+        seen["definitions"] = definitions
+        return {}
+
+    monkeypatch.setattr(ca, "_classify", _classify)
+
+    ca.analyse_document("Some document text.", "footing requirements")
+
+    assert seen["definitions"] == [
+        {"term": "Footing", "definition": "The construction that transfers loads."}
+    ]
 
 
 def test_is_quota_error_true_for_429():

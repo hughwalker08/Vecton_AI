@@ -1,0 +1,201 @@
+{
+  "group": "b",
+  "reviewer": "Aston Bailey-Fong",
+  "created_at": "2026-10-13T10:56:03+00:00",
+  "updated_at": "2026-10-18T05:55:24+00:00",
+  "results": {
+    "housing/figure-10.2.15a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.15a: Typical enclosed stepped down shower construction (membrane below tile bed)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-13T10:56:57+00:00"
+    },
+    "housing/figure-10.2.15c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.15c: Typical unenclosed stepped down shower construction (membrane below tile bed)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-13T10:57:30+00:00"
+    },
+    "housing/figure-10.2.16.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.16: Typical hob construction — internal membrane",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-13T10:57:50+00:00"
+    },
+    "housing/figure-10.2.18.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.18: Typical termination of membrane at extent of shower area",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-13T10:58:24+00:00"
+    },
+    "housing/figure-10.2.19b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.19b: Typical preformed shower base/floor junction on timber floors, including particleboard, plywood and other timber materials",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-13T11:03:38+00:00"
+    },
+    "housing/figure-10.2.20.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.20: Typical bath junctions",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-13T22:01:19+00:00"
+    },
+    "housing/figure-10.2.27.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.27 (explanatory): Typical bond breaker details",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-13T22:01:49+00:00"
+    },
+    "housing/figure-10.2.4a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.4a: Areas adjacent to baths and spas without showers for concrete, compressed fibre-ce­ ment and fibre-cement sheet flooring",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-13T22:02:19+00:00"
+    },
+    "housing/figure-10.2.5.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.5: Bath and vessel abutting wall — areas to be protected",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-14T10:40:16+00:00"
+    },
+    "housing/figure-10.4.2.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.4.2: Construction of sanitary compartments",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-14T10:40:23+00:00"
+    },
+    "housing/figure-10.6.2.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.6.2: Method of determining areas of openings for borrowed ventilation",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-flash-latest",
+      "reviewed_at": "2026-10-14T10:40:31+00:00"
+    },
+    "housing/figure-10.7.1.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.1: Required airborne and impact sound insulation — Plan view",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-14T10:40:41+00:00"
+    },
+    "housing/figure-10.7.3b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.3b: Typical installation of plaster sheets for sound insulation",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-14T10:41:05+00:00"
+    },
+    "housing/figure-10.7.5b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.5b: Two leaves of 110 mm clay brick masonry (method 2)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-14T10:41:11+00:00"
+    },
+    "housing/figure-10.7.5d.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.5d: Single leaf of 90 mm clay brick masonry",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-14T10:43:28+00:00"
+    },
+    "housing/figure-10.7.6a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.6a: 150 mm thick plain off form concrete",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-14T10:43:34+00:00"
+    },
+    "housing/figure-10.7.6c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.6c: 100 mm thick concrete panel",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-14T10:43:50+00:00"
+    },
+    "housing/figure-10.7.7a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.7a: 75 mm thick autoclaved aerated concrete wall panel (method 1)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-14T10:44:12+00:00"
+    },
+    "housing/figure-10.7.7c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.7c: Two leaves of 75 mm autoclaved aerated concrete wall panel",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-14T10:44:19+00:00"
+    },
+    "housing/figure-10.7.8b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.8b: Two rows of 64 mm steel studs at 600 mm centres",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-14T10:45:04+00:00"
+    },
+    "housing/figure-10.8.3b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.8.3b (explanatory): Example ventilation openings calculation",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-14T10:45:18+00:00"
+    }
+  },
+  "total": 90,
+  "reviewed": 21,
+  "correct": 21,
+  "incorrect": 0
+}

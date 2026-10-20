@@ -9,6 +9,13 @@ monkeypatched there directly -- no real Gemini/DB calls happen in this file.
 import pytest
 
 from app.api.routes import chat
+from app.services import glossary
+
+
+@pytest.fixture(autouse=True)
+def _no_real_condense(monkeypatch):
+    """Never let a route test reach Gemini for query condensation."""
+    monkeypatch.setattr(chat, "condense_question", lambda question, history: question)
 
 
 @pytest.fixture(autouse=True)
@@ -90,6 +97,55 @@ def test_ask_question_forwards_attachment_to_generate_answer(client, monkeypatch
     assert response.status_code == 200
     assert received["attachment_name"] == "site-plan.pdf"
     assert received["attachment_text"] == "All footings are 300mm deep."
+
+
+def test_ask_question_passes_glossary_definitions_to_generate_answer(client, monkeypatch):
+    monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [_chunk(defined_terms=["Footing"])])
+    glossary._set_terms({"Footing": "The construction that transfers loads to the foundation."})
+    received = {}
+
+    def _generate_answer(question, chunks, **kwargs):
+        received.update(kwargs)
+        return "Footings must comply with H1D4."
+
+    monkeypatch.setattr(chat, "generate_answer", _generate_answer)
+
+    response = client.post(
+        "/api/chat/", json={"question": "What are the footing requirements?", "jurisdiction": "NSW"}
+    )
+
+    assert response.status_code == 200
+    assert received["definitions"] == [
+        {"term": "Footing", "definition": "The construction that transfers loads to the foundation."}
+    ]
+    # Definitions are prompt-only -- the sources panel shows just the clause.
+    assert [c["clause_id"] for c in response.json()["citations"]] == ["H1D4"]
+
+
+def test_ask_question_attaches_no_definitions_without_strong_context(client, monkeypatch):
+    monkeypatch.setattr(
+        chat, "retrieve", lambda *a, **k: [_chunk(rerank_score=0.0, defined_terms=["Footing"])]
+    )
+    glossary._set_terms({"Footing": "The construction that transfers loads to the foundation."})
+    received = {}
+
+    def _generate_answer(question, chunks, **kwargs):
+        received.update(kwargs)
+        return "Your report says footings are 300mm."
+
+    monkeypatch.setattr(chat, "generate_answer", _generate_answer)
+
+    client.post(
+        "/api/chat/",
+        json={
+            "question": "What does my footing report say?",
+            "jurisdiction": "NSW",
+            "attachment_name": "report.pdf",
+            "attachment_text": "Footings are 300mm deep.",
+        },
+    )
+
+    assert received["definitions"] == []
 
 
 def test_ask_question_passes_history_through_to_generate_answer(client, monkeypatch):
@@ -359,3 +415,60 @@ def test_ask_question_retrieves_on_the_condensed_query_but_answers_the_original(
     assert response.status_code == 200
     assert seen["query"] == "maximum riser height for a spiral stair"
     assert seen["question"] == "What about for a spiral stair?"
+
+
+def test_citations_from_skips_abcb_parts():
+    chunks = [
+        _chunk(
+            clause_id="10.8",
+            doc="ABCB Housing Provisions",
+            node_type="part",
+            heading="10.8 Condensation Management",
+            text="In Tasmania, Part 10.8 is replaced with Part 10.8 of the ABCB Housing Provisions 2022.",
+        )
+    ]
+
+    assert chat._citations_from(chunks) == []
+
+
+def test_citations_from_keeps_ncc_parts_with_real_text():
+    chunks = [
+        _chunk(
+            clause_id="H6",
+            node_type="part",
+            heading="H6 Energy efficiency",
+            text="This Part is intended to improve the efficient use of energy.",
+        )
+    ]
+
+    assert len(chat._citations_from(chunks)) == 1
+
+
+def test_citations_from_skips_chunks_whose_text_is_just_the_title():
+    chunks = [
+        _chunk(
+            clause_id="42",
+            node_type="specification",
+            heading="42 House energy rating software",
+            text="House energy rating software",
+        )
+    ]
+
+    assert chat._citations_from(chunks) == []
+
+
+def test_citations_from_skips_chunks_with_empty_text():
+    assert chat._citations_from([_chunk(text="  ")]) == []
+
+
+def test_citations_from_short_chunk_with_real_text_is_still_cited():
+    assert len(chat._citations_from([_chunk(text="Footings required.")])) == 1
+
+
+def test_citations_from_header_does_not_shadow_a_later_chunk_for_the_same_clause():
+    chunks = [_chunk(heading="H1D4 Footings", text="Footings"), _chunk()]
+
+    citations = chat._citations_from(chunks)
+
+    assert len(citations) == 1
+    assert citations[0].text == "Footings must be designed to support the loads."

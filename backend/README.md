@@ -293,13 +293,14 @@ re-embedding the corpus breaks retrieval).
 
 The 270 generated descriptions have never been checked against the drawings
 they describe. `scripts/review_descriptions.py` is a small local app for doing
-that, split so two people can work in parallel without colliding.
+that, split three ways so reviewers can work in parallel.
 
 ```bash
 cd backend
-python scripts/review_descriptions.py --group a --reviewer "Your Name"   # reviewer 1
-python scripts/review_descriptions.py --group b --reviewer "Their Name"  # reviewer 2
-python scripts/review_descriptions.py --group a --summary                # progress, no server
+python scripts/review_descriptions.py --group a --reviewer "Name"   # 90 figures
+python scripts/review_descriptions.py --group b --reviewer "Name"   # 90 figures
+python scripts/review_descriptions.py --group c --reviewer "Name"   # 90 figures
+python scripts/review_descriptions.py --summary                     # progress, no server
 ```
 
 Each opens `http://127.0.0.1:8900` with the figure on the left and its
@@ -308,14 +309,36 @@ opens a box that **must** say what is wrong -- a bare "incorrect" tells
 whoever fixes it nothing. `U` jumps to the next unreviewed figure, arrows
 navigate, clicking the image zooms it.
 
-Results land in `data/review/group-a.json` and `data/review/group-b.json`,
-written after every verdict (atomically, via a temp file) so there is no save
-step and closing the tab loses nothing. Re-running resumes where you left off.
+Results land in `data/review/group-<x>.json`, written after every verdict
+(atomically, via a temp file) so there is no save step and closing the tab
+loses nothing. Re-running resumes where you left off.
 
-The split is deterministic and alternating, so each reviewer gets 135 figures
-with the same mix of Volume Two and Housing Provisions -- a straight halving
-would have given one person every Volume Two drawing. Re-running never
-reshuffles an in-progress workload.
+### Who reviews what
+
+`data/review/assignments.json` is the shared manifest: it maps every figure to
+a group, and **it is committed**, so all three reviewers work from the same
+split rather than each machine computing its own.
+
+```bash
+python scripts/review_descriptions.py --rebalance   # recompute, then commit the manifest
+```
+
+Rebalancing is only needed when the number of reviewers changes or figures are
+added. Two guarantees:
+
+- **A figure that already has a verdict never moves.** It stays with whoever
+  reviewed it, so no verdict is lost and no drawing is handed to two people.
+- **Each corpus is dealt separately**, so everyone gets the same mix -- 80
+  Housing Provisions and 10 Volume Two each. Dealing the combined list would
+  let one reviewer collect most of the 30 Volume Two drawings.
+
+The result is deterministic: the same inputs always produce the same split, so
+re-running never reshuffles someone's in-progress workload.
+
+One caveat: `--rebalance` can only pin verdicts it can see. The per-reviewer
+`group-<x>.json` files are not committed by default, so if another reviewer has
+started on their own machine, copy their file into `data/review/` before
+rebalancing -- the command warns about any group whose file is missing.
 
 Stdlib only, no new dependencies. It runs a tiny server rather than being a
 plain `file://` page because the figures are 39 MB (too much to inline) and a
