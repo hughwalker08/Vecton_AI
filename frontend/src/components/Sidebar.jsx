@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
+import { TrashIcon } from './FolderBrowser.jsx'
 import './Sidebar.css'
 
 function getInitials(email) {
@@ -9,7 +10,14 @@ function getInitials(email) {
   return name.slice(0, 2).toUpperCase()
 }
 
-export default function Sidebar({ chats = [], files = [], projects = [], onCreateProject, userEmail }) {
+export default function Sidebar({
+  chats = [],
+  onDeleteChat,
+  files = [],
+  projects = [],
+  onCreateProject,
+  userEmail,
+}) {
   const { chatId: activeChatId, projectId: activeProjectId } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -47,6 +55,13 @@ export default function Sidebar({ chats = [], files = [], projects = [], onCreat
       navigate(`/project/${id}`)
       closeMenu()
     }
+  }
+
+  // Sidebar sits outside <Routes> in App.jsx, so useParams() has no chatId
+  // there -- match the open chat off the path instead.
+  function deleteChat(id) {
+    onDeleteChat?.(id)
+    if (location.pathname === `/chat/${id}`) navigate('/')
   }
 
   const filteredChats = useMemo(() => {
@@ -194,16 +209,26 @@ export default function Sidebar({ chats = [], files = [], projects = [], onCreat
                 </p>
               ) : (
                 filteredChats.map((chat) => (
-                  <Link
-                    key={chat.id}
-                    to={`/chat/${chat.id}`}
-                    className="recent"
-                    aria-current={chat.id === activeChatId}
-                    title={chat.title}
-                    onClick={closeMenu}
-                  >
-                    {chat.title}
-                  </Link>
+                  <div key={chat.id} className="chat-row">
+                    <Link
+                      to={`/chat/${chat.id}`}
+                      className="recent"
+                      aria-current={chat.id === activeChatId}
+                      title={chat.title}
+                      onClick={closeMenu}
+                    >
+                      {chat.title}
+                    </Link>
+                    <button
+                      type="button"
+                      className="chat-delete"
+                      aria-label={`Delete ${chat.title}`}
+                      title="Delete chat"
+                      onClick={() => deleteChat(chat.id)}
+                    >
+                      <TrashIcon />
+                    </button>
+                  </div>
                 ))
               )}
             </>

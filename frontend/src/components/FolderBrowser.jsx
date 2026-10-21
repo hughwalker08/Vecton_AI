@@ -58,6 +58,20 @@ export function XIcon() {
   )
 }
 
+export function TrashIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+      <path
+        d="M4.5 6.5h15M9.5 6.5V4.5h5v2M6.5 6.5l.8 13h9.4l.8-13M10 10.5v5.5M14 10.5v5.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function BackIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
