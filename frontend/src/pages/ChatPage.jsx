@@ -4,7 +4,7 @@ import { askQuestion } from '../api/client.js'
 import { useAttachment } from '../hooks/useAttachment.js'
 import { supabase } from '../lib/supabase.js'
 import { deriveChatTitle } from '../lib/chatTitle.js'
-import { renderMarkdownLite } from '../lib/markdownLite.jsx'
+import Markdown from '../lib/Markdown.jsx'
 import SourcePanel from '../components/SourcePanel.jsx'
 import './ChatPage.css'
 
@@ -342,7 +342,7 @@ function ChatView({ chats = [], defaultJurisdiction, userId }) {
             ) : (
               <div className="answer-block" key={message.id}>
                 <div className={`answer ${message.isError ? 'answer-error' : ''}`}>
-                  {renderMarkdownLite(message.text)}
+                  <Markdown>{message.text}</Markdown>
                 </div>
 
                 {message.abstained && !message.isError && (
