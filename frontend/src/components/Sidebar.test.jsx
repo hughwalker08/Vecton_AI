@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import Sidebar from './Sidebar.jsx'
 
@@ -192,5 +192,39 @@ describe('Sidebar', () => {
     fireEvent.submit(screen.getByLabelText('New project name').closest('form'))
 
     expect(onCreateProject).toHaveBeenCalledWith('Wattle Court build')
+  })
+
+  it('deletes a chat from its row without opening it', () => {
+    const onDeleteChat = vi.fn()
+    renderSidebar({
+      chats: [
+        { id: 'abc', title: 'Ceiling height in bedrooms' },
+        { id: 'def', title: 'Stair riser limits' },
+      ],
+      onDeleteChat,
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Stair riser limits' }))
+
+    expect(onDeleteChat).toHaveBeenCalledWith('def')
+    expect(screen.getByRole('link', { name: /new chat/i })).toHaveAttribute('aria-current', 'true')
+  })
+
+  it('goes back home when the open chat is deleted', () => {
+    const onDeleteChat = vi.fn()
+    render(
+      <MemoryRouter initialEntries={['/chat/abc']}>
+        <Sidebar chats={[{ id: 'abc', title: 'Ceiling height in bedrooms' }]} onDeleteChat={onDeleteChat} />
+        <Routes>
+          <Route path="/" element={<div>home page</div>} />
+          <Route path="/chat/:chatId" element={<div>chat page</div>} />
+        </Routes>
+      </MemoryRouter>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Ceiling height in bedrooms' }))
+
+    expect(onDeleteChat).toHaveBeenCalledWith('abc')
+    expect(screen.getByText('home page')).toBeInTheDocument()
   })
 })

@@ -115,12 +115,13 @@
 }
 
 .project-chat-list li {
+  position: relative;
   border-bottom: 1px solid var(--rule-soft, #f0ede7);
 }
 
 .project-chat-list a {
   display: block;
-  padding: 12px 4px;
+  padding: 12px 36px 12px 4px;
   font-size: 14px;
   font-weight: 600;
   color: var(--ink, #1b1a18);
@@ -132,4 +133,40 @@
 
 .project-chat-list a:hover {
   color: var(--accent, #f05a22);
+}
+
+/* Same hover-only delete as the sidebar's chat rows (see Sidebar.css). */
+.project-chat-delete {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted, #8d8880);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s, background 0.12s;
+}
+
+.project-chat-list li:hover .project-chat-delete,
+.project-chat-list li:focus-within .project-chat-delete {
+  opacity: 1;
+}
+
+.project-chat-delete:hover {
+  color: var(--ink, #1b1a18);
+  background: var(--rule, #e6e3dd);
+}
+
+@media (hover: none) {
+  .project-chat-delete {
+    opacity: 1;
+  }
 }

@@ -126,4 +126,17 @@ describe('ProjectPage', () => {
     const updater = setProjects.mock.calls[0][0]
     expect(updater([{ id: 'p1', name: 'Wattle Court build' }])).toEqual([])
   })
+
+  it('deletes a chat from the project chat list without opening it', () => {
+    const onDeleteChat = vi.fn()
+    renderProjectPage({
+      chats: [{ id: 'c1', title: 'Balustrade height', projectId: 'p1' }],
+      onDeleteChat,
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Balustrade height' }))
+
+    expect(onDeleteChat).toHaveBeenCalledWith('c1')
+    expect(screen.queryByText('chat page')).not.toBeInTheDocument()
+  })
 })

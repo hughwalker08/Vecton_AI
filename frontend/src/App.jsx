@@ -43,6 +43,22 @@ export default function App() {
     return id
   }
 
+  // Optimistic, like ProjectPage's deleteProject. The row's messages go with
+  // it via messages.conversation_id's ON DELETE CASCADE (migration 0007);
+  // the DELETE policy that lets this through is migration 0012. A chat that
+  // never got its first message has no row yet, so this is a harmless no-op
+  // delete for it.
+  function deleteChat(id) {
+    setChats((currentChats) => currentChats.filter((chat) => chat.id !== id))
+    supabase
+      .from('conversations')
+      .delete()
+      .eq('id', id)
+      .then(({ error }) => {
+        if (error) console.error(error)
+      })
+  }
+
   function createProject(name) {
     const trimmed = name.trim()
     if (!trimmed) return null
@@ -276,6 +292,7 @@ export default function App() {
       <div className="app-shell">
         <Sidebar
           chats={chats}
+          onDeleteChat={deleteChat}
           files={uploadedFiles}
           projects={projects}
           onCreateProject={createProject}
@@ -329,6 +346,7 @@ export default function App() {
                   setProjects={setProjects}
                   chats={chats}
                   onStartChat={createChat}
+                  onDeleteChat={deleteChat}
                   files={uploadedFiles}
                   setFiles={setUploadedFiles}
                   folders={folders}
