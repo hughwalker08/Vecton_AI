@@ -22,7 +22,15 @@ const LOADING_STAGES = [
 ]
 const LOADING_STAGE_INTERVAL_MS = 2500
 
-export default function ChatPage({ chats = [], defaultJurisdiction, userId }) {
+// React Router keeps the same element mounted when only :chatId changes, so
+// without the key a sidebar switch would keep the previous chat's messages,
+// input and attachment on screen.
+export default function ChatPage(props) {
+  const { chatId } = useParams()
+  return <ChatView key={chatId} {...props} />
+}
+
+function ChatView({ chats = [], defaultJurisdiction, userId }) {
   const [question, setQuestion] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [loadingStage, setLoadingStage] = useState(0)
