@@ -240,10 +240,9 @@ entry point (also used by compliance analysis, below):
 `app.services.generation.generate_answer(question, chunks, jurisdiction)`
 then builds a citation-strict prompt from the reranked chunks (clause ID,
 document, verbatim text, applicability qualifiers, Standard hand-offs) and
-calls Gemini (`temperature=0`, light Markdown output — the chat UI renders
-`**bold**`, `*italic*`, and `- ` bullets, see `generation.py`'s
-`SYSTEM_INSTRUCTION` and `frontend/src/lib/markdownLite.jsx` for exactly
-what's supported; anything else shows up as literal punctuation). It
+calls Gemini (`temperature=0`, Markdown output with headings, nested
+bullets and tables — rendered by `frontend/src/lib/Markdown.jsx`
+(react-markdown + remark-gfm); see `generation.py`'s `SYSTEM_INSTRUCTION`). It
 refuses to answer without supporting context, treats
 a truncated response (`MAX_TOKENS`) as a hard failure rather than serving a
 cut-off legal quote, and raises `QuotaExceededError` (surfaced as HTTP 429)

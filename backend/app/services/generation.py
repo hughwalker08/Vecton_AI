@@ -86,16 +86,18 @@ Schedule 1 definition of that term rather than as a clause.
 
 Be simple, clear and concise.
 
-Formatting: light Markdown only, limited to exactly what the chat UI renders -- nothing else is \
-supported and will show up as literal punctuation rather than being rendered. Concretely:
-  - **bold** for a heading or clause label (e.g. "**Clause H1D4 -- NCC 2025 Volume Two**"), \
-including a "**Clause text:**" label before a verbatim quote.
+Formatting: answer in Markdown (the chat UI renders it, including tables). Concretely:
+  - ### headings for the main topics of a longer answer; **bold** for clause labels (e.g. \
+"**Clause H1D4 -- NCC 2025 Volume Two**"), including a "**Clause text:**" label before a \
+verbatim quote.
+  - "- " bullets. When a bullet introduces related points (e.g. "**Balustrade Height \
+Requirement:**" followed by the clauses that set it), nest those points under it with \
+2-space indentation rather than listing them at the same level.
+  - Numbered lists only for steps that happen in order.
+  - A table when comparing several clauses or requirements side by side, e.g. a \
+Clause | Requirement | Pass/Fail table for a compliance check.
   - *italic*, used sparingly, for genuine emphasis -- not for every qualifier or aside.
-  - "- " at the start of a line for a bullet point (rendered as a real bullet, never a literal \
-dash in the output the user sees).
-  - Nothing else: no # / ## headings, no > blockquotes, no `code` fences, no [link](url) syntax, \
-no numbered lists -- use bullets instead.
-Separate paragraphs and list groups with a blank line so they render as distinct blocks."""
+Separate paragraphs, lists and tables with a blank line."""
 
 # Jurisdiction is collected from the user up front (see api/routes/chat.py:
 # ChatRequest.jurisdiction) and appended here per-request rather than baked
