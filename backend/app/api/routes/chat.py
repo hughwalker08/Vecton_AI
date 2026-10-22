@@ -41,7 +41,7 @@ from pydantic import BaseModel
 
 from app.services.embedding import EmbeddingError
 from app.services.embedding import QuotaExceededError as EmbeddingQuotaExceeded
-from app.services.generation import GenerationError, condense_question, generate_answer
+from app.services.generation import NO_ANSWER_MARKER, GenerationError, condense_question, generate_answer
 from app.services.generation import QuotaExceededError as GenerationQuotaExceeded
 from app.services.glossary import definitions_for
 from app.services.retrieval import QuotaExceededError as RerankQuotaExceeded
@@ -163,6 +163,32 @@ def _citations_from(chunks: list[dict]) -> list[Citation]:
     return citations
 
 
+# Glossary entries have no clause_id, so they never become chunks/chips (see
+# _citations_from). When an answer quotes one, it gets its own chip so the
+# quoted text can be opened and checked like any clause.
+_DEFINITIONS_DOC = "NCC Schedule 1 -- Definitions"
+_QUOTE_PROBE_CHARS = 40
+
+
+def _squash(text: str) -> str:
+    return " ".join(text.split()).lower()
+
+
+def _definition_citations(answer: str, definitions: list[dict]) -> list[Citation]:
+    """A Citation for each definition the answer quotes, i.e. whose opening
+    words appear in it. A term that merely shows up in the answer doesn't count."""
+    haystack = _squash(answer)
+    citations = []
+    for item in definitions:
+        definition = (item.get("definition") or "").strip()
+        probe = _squash(definition)[:_QUOTE_PROBE_CHARS]
+        if probe and probe in haystack:
+            citations.append(
+                Citation(clause_id=item["term"], doc=_DEFINITIONS_DOC, heading=item["term"], text=definition)
+            )
+    return citations
+
+
 @router.post("/", response_model=ChatResponse)
 def ask_question(request: ChatRequest) -> ChatResponse:
     """Generate a cited answer for the chat UI, grounded in retrieved chunks."""
@@ -217,8 +243,16 @@ def ask_question(request: ChatRequest) -> ChatResponse:
     if not answer:
         return ChatResponse(answer="No source found.", citations=[], abstained=True)
 
+    # The model says the context has nothing on the question. The reranker can't
+    # tell: it scores near-miss clauses ("building height" vs ceiling height)
+    # very high, so those chunks reached the model and showed up as chips under
+    # a decline. Keep its explanation, drop the sources, mark it an abstain.
+    if answer.lstrip().startswith(NO_ANSWER_MARKER):
+        explanation = answer.lstrip()[len(NO_ANSWER_MARKER):].strip()
+        return ChatResponse(answer=explanation or "No source found.", citations=[], abstained=True)
+
     return ChatResponse(
         answer=answer,
-        citations=_citations_from(context_chunks),
+        citations=_citations_from(context_chunks) + _definition_citations(answer, definitions),
         abstained=False,
     )

@@ -50,3 +50,30 @@ def test_parse_glossary_file_with_no_content_is_empty_text(make_corpus):
     chunk = parse_glossary_file(root, corpus)
 
     assert chunk.text == ""
+
+
+def test_parse_glossary_file_keeps_the_list_from_a_later_content_block(make_corpus):
+    root = parse(
+        """
+        <glossentry id="_g3">
+          <glossterm>Habitable room</glossterm>
+          <glossdef>
+            <content><p>A room used for normal domestic activities, and\u2014</p></content>
+            <content>
+              <ol class="alpha">
+                <li>includes a bedroom and a kitchen; but</li>
+                <li>excludes a bathroom and a laundry.</li>
+              </ol>
+            </content>
+          </glossdef>
+        </glossentry>
+        """
+    )
+    corpus = make_corpus(root)
+
+    chunk = parse_glossary_file(root, corpus)
+
+    lines = chunk.text.split("\n")
+    assert lines[0] == "A room used for normal domestic activities, and\u2014"
+    assert any("includes a bedroom and a kitchen" in line for line in lines[1:])
+    assert any("excludes a bathroom and a laundry" in line for line in lines[1:])
