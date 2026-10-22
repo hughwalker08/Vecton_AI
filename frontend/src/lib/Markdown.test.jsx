@@ -49,6 +49,16 @@ describe('Markdown', () => {
     expect(container.querySelector('em')).toHaveTextContent('only')
   })
 
+  it('keeps a quoted clause\'s sub-clauses on separate lines', () => {
+    const container = renderText(
+      '> (b) The height must not be less than—\n>   (i) 1 m above the floor; or\n>   (ii) 865 mm above a landing.',
+    )
+
+    const quote = container.querySelector('blockquote')
+    expect(quote.querySelectorAll('br')).toHaveLength(2)
+    expect(quote).toHaveTextContent('(i) 1 m above the floor; or')
+  })
+
   it('shows raw HTML as text instead of injecting it', () => {
     const container = renderText('<img src=x onerror="alert(1)"> text')
 
