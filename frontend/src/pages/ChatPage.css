@@ -110,7 +110,6 @@
 .answer blockquote {
   padding-left: 12px;
   border-left: 3px solid var(--rule, #e3dfd8);
-  color: var(--muted, #6f6a62);
 }
 
 .answer code {
