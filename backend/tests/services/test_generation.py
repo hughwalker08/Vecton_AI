@@ -181,3 +181,7 @@ def test_format_chunk_renders_australian_standard_hand_offs():
     text = gen._format_chunk(chunk)
 
     assert "Australian Standard hand-off: AS 3786 5.1, AS 1684" in text
+
+
+def test_system_instruction_tells_the_model_how_to_flag_no_answer():
+    assert gen.NO_ANSWER_MARKER in gen.SYSTEM_INSTRUCTION

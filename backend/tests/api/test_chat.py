@@ -472,3 +472,87 @@ def test_citations_from_header_does_not_shadow_a_later_chunk_for_the_same_clause
 
     assert len(citations) == 1
     assert citations[0].text == "Footings must be designed to support the loads."
+
+
+def test_ask_question_marks_a_no_answer_reply_as_abstained_and_drops_the_citations(client, monkeypatch):
+    monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [_chunk(rerank_score=0.999)])
+    monkeypatch.setattr(
+        chat,
+        "generate_answer",
+        lambda *a, **k: "[[NO_ANSWER]]\nThe context has nothing on the Brisbane City Plan.",
+    )
+
+    response = client.post(
+        "/api/chat/", json={"question": "Max building height under the Brisbane City Plan?", "jurisdiction": "NSW"}
+    )
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["abstained"] is True
+    assert body["citations"] == []
+    assert body["answer"] == "The context has nothing on the Brisbane City Plan."
+
+
+def test_ask_question_bare_no_answer_marker_falls_back_to_no_source_found(client, monkeypatch):
+    monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [_chunk()])
+    monkeypatch.setattr(chat, "generate_answer", lambda *a, **k: "[[NO_ANSWER]]")
+
+    body = client.post("/api/chat/", json={"question": "Anything?", "jurisdiction": "NSW"}).json()
+
+    assert body["abstained"] is True
+    assert body["answer"] == "No source found."
+    assert body["citations"] == []
+
+
+def test_ask_question_marker_text_mid_answer_is_not_an_abstain(client, monkeypatch):
+    monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [_chunk()])
+    monkeypatch.setattr(chat, "generate_answer", lambda *a, **k: "Footings apply. [[NO_ANSWER]] is not a thing here.")
+
+    body = client.post("/api/chat/", json={"question": "Footings?", "jurisdiction": "NSW"}).json()
+
+    assert body["abstained"] is False
+    assert len(body["citations"]) == 1
+
+
+def test_definition_citations_cover_only_definitions_the_answer_quotes():
+    definitions = [
+        {
+            "term": "Habitable room",
+            "definition": "A room used for normal domestic activities, and—\n(a) includes a bedroom",
+        },
+        {"term": "Going", "definition": "The horizontal dimension from the front to the back of a tread."},
+    ]
+    answer = (
+        "**Definition text:** A room used for normal domestic activities, and— (a) includes a bedroom. "
+        "The going is 240 mm."
+    )
+
+    citations = chat._definition_citations(answer, definitions)
+
+    assert [c.clause_id for c in citations] == ["Habitable room"]
+    assert citations[0].heading == "Habitable room"
+    assert citations[0].text.startswith("A room used for normal domestic activities")
+    assert citations[0].doc == chat._DEFINITIONS_DOC
+
+
+def test_definition_citations_empty_without_definitions_or_quotes():
+    assert chat._definition_citations("Anything", []) == []
+    assert chat._definition_citations("Anything", [{"term": "X", "definition": ""}]) == []
+
+
+def test_ask_question_adds_a_chip_for_a_quoted_definition(client, monkeypatch):
+    monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [_chunk()])
+    monkeypatch.setattr(
+        chat, "definitions_for",
+        lambda *a, **k: [
+            {"term": "Footing", "definition": "The part of a building that transfers loads to the ground."}
+        ],
+    )
+    monkeypatch.setattr(
+        chat, "generate_answer",
+        lambda *a, **k: "Footing: The part of a building that transfers loads to the ground.",
+    )
+
+    body = client.post("/api/chat/", json={"question": "Footings?", "jurisdiction": "NSW"}).json()
+
+    assert [c["clause_id"] for c in body["citations"]] == ["H1D4", "Footing"]
