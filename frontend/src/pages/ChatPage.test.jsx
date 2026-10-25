@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ChatPage from './ChatPage.jsx'
 
@@ -13,6 +13,10 @@ vi.mock('../api/client.js', () => ({
 // these tests exercise persistence itself (that's covered separately); this
 // just keeps them from making real network calls, always resolving as if
 // this chat has no prior history and every write succeeds.
+// Per-chat stored history, keyed by conversation_id. Empty unless a test
+// seeds it.
+const historyByChat = vi.hoisted(() => ({}))
+
 vi.mock('../lib/supabase.js', () => ({
   supabase: {
     from: vi.fn((table) => {
@@ -25,7 +29,9 @@ vi.mock('../lib/supabase.js', () => ({
       if (table === 'messages') {
         return {
           select: () => ({
-            eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }),
+            eq: (_column, chatId) => ({
+              order: () => Promise.resolve({ data: historyByChat[chatId] ?? [], error: null }),
+            }),
           }),
           insert: () => Promise.resolve({ error: null }),
         }
@@ -56,11 +62,34 @@ function renderChatPage({ jurisdiction = 'NSW', route = '/chat/abc', state } = {
 }
 
 beforeEach(() => {
+  for (const chatId of Object.keys(historyByChat)) delete historyByChat[chatId]
   askQuestion.mockReset()
   uploadDocument.mockReset()
 })
 
 describe('ChatPage', () => {
+  it('shows the other chat\'s history when switching chats from the sidebar', async () => {
+    historyByChat.a = [{ id: 'a1', role: 'user', text: 'Question from chat A', citations: [] }]
+    historyByChat.b = [{ id: 'b1', role: 'user', text: 'Question from chat B', citations: [] }]
+    render(
+      <MemoryRouter initialEntries={['/chat/a']}>
+        <Link to="/chat/b">Open chat B</Link>
+        <Routes>
+          <Route
+            path="/chat/:chatId"
+            element={<ChatPage defaultJurisdiction="NSW" userId="user-1" />}
+          />
+        </Routes>
+      </MemoryRouter>
+    )
+    expect(await screen.findByText('Question from chat A')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Open chat B'))
+
+    expect(await screen.findByText('Question from chat B')).toBeInTheDocument()
+    expect(screen.queryByText('Question from chat A')).not.toBeInTheDocument()
+  })
+
   it('sends the typed question and renders the answer with citations, opening the source panel on click', async () => {
     askQuestion.mockResolvedValue({
       answer: 'Footings must comply with H1D4.',

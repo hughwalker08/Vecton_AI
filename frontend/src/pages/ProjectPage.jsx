@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
-import FolderBrowser, { PencilIcon, XIcon } from '../components/FolderBrowser.jsx'
+import FolderBrowser, { PencilIcon, TrashIcon, XIcon } from '../components/FolderBrowser.jsx'
 import './ProjectPage.css'
 
 // A project is an optional extra layer above chats and folders (see
@@ -14,6 +14,7 @@ export default function ProjectPage({
   setProjects,
   chats,
   onStartChat,
+  onDeleteChat,
   files,
   setFiles,
   folders,
@@ -136,6 +137,15 @@ export default function ProjectPage({
               {projectChats.map((chat) => (
                 <li key={chat.id}>
                   <Link to={`/chat/${chat.id}`}>{chat.title}</Link>
+                  <button
+                    type="button"
+                    className="project-chat-delete"
+                    aria-label={`Delete ${chat.title}`}
+                    title="Delete chat"
+                    onClick={() => onDeleteChat?.(chat.id)}
+                  >
+                    <TrashIcon />
+                  </button>
                 </li>
               ))}
             </ul>
