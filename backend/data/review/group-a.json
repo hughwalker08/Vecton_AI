@@ -1,0 +1,822 @@
+{
+  "group": "a",
+  "reviewer": "Toufiq Anindya",
+  "created_at": "2026-10-18T07:47:05+00:00",
+  "updated_at": "2026-10-25T11:10:16+00:00",
+  "results": {
+    "housing/figure-1.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 1: Alpine areas",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-18T07:53:39+00:00"
+    },
+    "housing/figure-10.7.5c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.5c: Single leaf of 110 mm clay brick masonry",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-18T11:53:18+00:00"
+    },
+    "housing/figure-10.2.15d.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.15d: Typical unenclosed stepped down shower construction (membrane above tile bed)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-21T23:38:52+00:00"
+    },
+    "housing/figure-10.2.19a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.19a: Typical preformed shower base wall/floor junction",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-flash-latest",
+      "reviewed_at": "2026-10-21T23:39:46+00:00"
+    },
+    "housing/figure-10.2.24.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.24: Typical bathroom door details for whole bathroom waterproofing",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-21T23:40:37+00:00"
+    },
+    "housing/figure-10.2.4b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.2.4b: Areas adjacent to baths and spas without showers for timber floors including particle­ board, plywood and other floor materials",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-21T23:54:13+00:00"
+    },
+    "housing/figure-10.5.1.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.5.1: Method of determining areas of openings for borrowed light",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-flash-latest",
+      "reviewed_at": "2026-10-24T11:26:07+00:00"
+    },
+    "housing/figure-10.7.3a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.3a: Sound insulation between buildings — Stud wall junctions",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-24T11:26:40+00:00"
+    },
+    "housing/figure-10.7.6b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.6b: 200 mm thick concrete panel",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-24T11:26:53+00:00"
+    },
+    "housing/figure-10.7.7b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.7.7b: 75 mm thick autoclaved aerated concrete wall panel (method 2)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-24T11:27:10+00:00"
+    },
+    "housing/figure-10.8.3a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.8.3a (explanatory): Example of roof space with low level ventilation",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-24T11:27:35+00:00"
+    },
+    "housing/figure-10.8.4a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.8.4a (explanatory):: Practical example of a roof space with multiple roof types and require­ ments",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-24T11:28:11+00:00"
+    },
+    "housing/figure-10.8.4c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 10.8.4c (explanatory):: Example of a roof space in accordance with 10.8.4(1)(a)(ii)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-24T11:28:28+00:00"
+    },
+    "housing/figure-11.2.2a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 11.2.2a: Measurement of slope relationship — Plan view — Stair with 2 flights",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-24T11:29:00+00:00"
+    },
+    "housing/figure-11.2.2c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 11.2.2c: Measurement of slope relationship — Plan view —Tapered treads more than 1 m wide",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-24T22:07:54+00:00"
+    },
+    "housing/figure-4.2.20.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 4.2.20: Localised thickening for concentrated loads",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T04:34:23+00:00"
+    },
+    "housing/figure-4.2.5.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 4.2.5: Foundations for footings and slabs",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T05:23:03+00:00"
+    },
+    "housing/figure-4.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 4: Identification of floor area of a room",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T05:23:17+00:00"
+    },
+    "housing/figure-5.4.2b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 5.4.2b: Engaged piers in external single leaf masonry walls to AS 3700",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T05:24:18+00:00"
+    },
+    "housing/figure-5.4.3b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 5.4.3b: Support for internal walls—supported by return walls",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T05:24:54+00:00"
+    },
+    "housing/figure-5.6.5a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 5.6.5a: Wall tie details (lowset)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T05:25:01+00:00"
+    },
+    "housing/figure-5.6.6b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 5.6.6b: Suitable tie-down strap details for cavity masonry",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T05:25:53+00:00"
+    },
+    "housing/figure-5.6.8a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 5.6.8a: Example of vertical articulation joint locations in plan view",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T05:26:09+00:00"
+    },
+    "housing/figure-5.6.8d.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 5.6.8d: Articulation joint in unreinforced single leaf masonry wall with compressed foam",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T06:58:15+00:00"
+    },
+    "housing/figure-5.7.6.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 5.7.6: Typical window installation for unreinforced single skin masonry",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T06:58:17+00:00"
+    },
+    "housing/figure-6.2.1b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 6.2.1b: Subfloor clearance requirements",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T06:58:18+00:00"
+    },
+    "housing/figure-6.3.5.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 6.3.5: Lintels supporting roof, frames and timber floors",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T07:02:59+00:00"
+    },
+    "housing/figure-6.3.7c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 6.3.7c: End cuts to strutting beams",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T09:15:08+00:00"
+    },
+    "housing/figure-6.3.7f.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 6.3.7f: Typical universal beam to column connection detail",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:00:02+00:00"
+    },
+    "housing/figure-6.3.8.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 6.3.8: Allowable zones for penetrations through structural steel members",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:00:12+00:00"
+    },
+    "housing/figure-7.2.3.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 7.2.3: Minimum pitch requirements for metal roofing profiles",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:00:19+00:00"
+    },
+    "housing/figure-7.2.7c.png": {
+      "verdict": "incorrect",
+      "issues": "the description says \"Isometric\" but this is more of a normal 3D perspective depiction",
+      "caption": "Figure 7.2.7c: Parapet and end wall flashing—Acceptable flashing details",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:13:09+00:00"
+    },
+    "housing/figure-7.3.2c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 7.3.2c: Fixing of tile requirements — Minimum tile fixing requirements N3",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:13:26+00:00"
+    },
+    "housing/figure-7.3.3a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 7.3.3a: Flashing abutting a masonry wall",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:13:44+00:00"
+    },
+    "housing/figure-7.3.3d.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 7.3.3d: Pipe penetration flashing",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:13:46+00:00"
+    },
+    "housing/figure-7.3.3g.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 7.3.3g: Bedded and pointed valley for high rainfall areas (refer definition of low rainfall intensity area)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:13:54+00:00"
+    },
+    "housing/figure-7.4.6a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 7.4.6a: Construction of front face slotted gutter",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:14:01+00:00"
+    },
+    "housing/figure-7.4.7a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 7.4.7a: Construction of end-stop weir",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:14:03+00:00"
+    },
+    "housing/figure-7.4.7d.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 7.4.7d: Construction of rainhead",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:14:05+00:00"
+    },
+    "housing/figure-7.5.2c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 7.5.2c: Fixing of vertical wall cladding",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-flash-latest",
+      "reviewed_at": "2026-10-25T10:14:19+00:00"
+    },
+    "housing/figure-7.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 7: Separating wall",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:14:32+00:00"
+    },
+    "housing/figure-8.4.5.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 8.4.5: Identification of glazing requirements for glazed panels",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:14:40+00:00"
+    },
+    "housing/figure-9.2.2a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.2a: Walls at right angles to the boundary",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:14:49+00:00"
+    },
+    "housing/figure-9.2.2d.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.2d: Measurement of distance — Buildings of different heights — Class 1 buildings on same allotment",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:15:07+00:00"
+    },
+    "housing/figure-9.2.3b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.3b: Typical construction of external walls — attached Class 1 buildings on the same allot­ ment",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:15:17+00:00"
+    },
+    "housing/figure-9.2.5c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.5c: External wall to Class 10a building with FRL (method 2)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:15:36+00:00"
+    },
+    "housing/figure-9.2.5f.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.5f: External wall of adjacent Class 10a building with FRL (method 1)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:16:08+00:00"
+    },
+    "housing/figure-9.2.5i.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.5i: External wall to Class 10 building with FRL",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:16:14+00:00"
+    },
+    "housing/figure-9.2.6c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.6c: External wall to Class 10a building with FRL (method 2)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:16:22+00:00"
+    },
+    "housing/figure-9.2.6f.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.6f: External wall of adjacent Class 10a building with FRL (method 1)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:16:25+00:00"
+    },
+    "housing/figure-9.2.7a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.7a: 1.8m separation between Class 10a buildings",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:16:32+00:00"
+    },
+    "housing/figure-9.2.7d.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.7d: External wall to a Class 10a buildings with FRL (method 2)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:49:59+00:00"
+    },
+    "housing/figure-9.2.7g.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.7g: External wall to adjacent Class 10a buildings with FRL (method 2)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:50:02+00:00"
+    },
+    "housing/figure-9.2.8b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.8b: Requirements for non-combustible infill panels to carport",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:50:14+00:00"
+    },
+    "housing/figure-9.2.9b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.2.9b: Allowable encroachments for non-combustible construction — Non-combustible fascia and gutter within 900 mm of an allotment boundary",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:50:18+00:00"
+    },
+    "housing/figure-9.3.1b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.3.1b: Separating wall construction — Underside of non-combustible roof cladding (diagram 1)",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:50:30+00:00"
+    },
+    "housing/figure-9.5.2b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.5.2b: Class 1a building where bedrooms are located in separate areas",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:52:27+00:00"
+    },
+    "vol2/figure-1.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 1: Alpine areas",
+      "corpus": "vol2",
+      "doc": "NCC 2025 Volume Two",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:52:32+00:00"
+    },
+    "vol2/figure-4.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 4: Identification of floor area of a room",
+      "corpus": "vol2",
+      "doc": "NCC 2025 Volume Two",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:52:35+00:00"
+    },
+    "vol2/figure-6b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 6b: Identification of a sanitary compartment (diagram b)",
+      "corpus": "vol2",
+      "doc": "NCC 2025 Volume Two",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:53:11+00:00"
+    },
+    "vol2/figure-A5G4.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure A5G4 (explanatory): WaterMark Certification Scheme Trademarks",
+      "corpus": "vol2",
+      "doc": "NCC 2025 Volume Two",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:53:32+00:00"
+    },
+    "vol2/figure-A6G2b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure A6G2b: Typical Class 1 building configurations",
+      "corpus": "vol2",
+      "doc": "NCC 2025 Volume Two",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:53:39+00:00"
+    },
+    "vol2/figure-A6G3b.png": {
+      "verdict": "incorrect",
+      "issues": "the generated description does not feature the limitations and the explanatory information section",
+      "caption": "Figure A6G3b (explanatory): Elevation showing a single storey of Class 2 with a common area below",
+      "corpus": "vol2",
+      "doc": "NCC 2025 Volume Two",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:54:58+00:00"
+    },
+    "vol2/figure-H1D4c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure H1D4c (explanatory): Geometric slab with re-entrant corner",
+      "corpus": "vol2",
+      "doc": "NCC 2025 Volume Two",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:55:09+00:00"
+    },
+    "vol2/figure-H1D6b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure H1D6b: Effective load width for structural steel bearers and strutting beams—Continuous span­ ning rafter or joist",
+      "corpus": "vol2",
+      "doc": "NCC 2025 Volume Two",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:55:17+00:00"
+    },
+    "vol2/figure-H1D6e.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure H1D6e: Floor, wall, ceiling and other framing members",
+      "corpus": "vol2",
+      "doc": "NCC 2025 Volume Two",
+      "model": "gemini-flash-latest",
+      "reviewed_at": "2026-10-25T10:55:25+00:00"
+    },
+    "vol2/figure-H1D7b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure H1D7b: Section of a typical tile roof",
+      "corpus": "vol2",
+      "doc": "NCC 2025 Volume Two",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:55:33+00:00"
+    },
+    "housing/figure-11.3.2.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 11.3.2: Typical stairway and barrier members",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:56:00+00:00"
+    },
+    "housing/figure-11.3.4b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 11.3.4b: Measuring heights for barriers and handrails and where transition zones are allowed",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-flash-latest",
+      "reviewed_at": "2026-10-25T10:56:17+00:00"
+    },
+    "housing/figure-11.3.8.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 11.3.8: Protection of openable windows — rooms other than bedrooms",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-3.1-pro-preview",
+      "reviewed_at": "2026-10-25T10:56:22+00:00"
+    },
+    "housing/figure-12.2.4b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 12.2.4b: Clear spaces around buildings — External doorway discharging into a court between wings of a building",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:56:26+00:00"
+    },
+    "housing/figure-12.3.2a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 12.3.2a: Methods of attachment — No. 14 partial threaded self-drilling screws into a timber framed external wall",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T10:56:29+00:00"
+    },
+    "housing/figure-12.4.2.png": {
+      "verdict": "incorrect",
+      "issues": "description is missing information from the \"chimney construction\" section",
+      "caption": "Figure 12.4.2: Fireplace clearance from combustible materials",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:01:11+00:00"
+    },
+    "housing/figure-12.4.5a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 12.4.5a: Acceptable location of free standing heating appliances — Elevation",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:01:24+00:00"
+    },
+    "housing/figure-13.2.6.png": {
+      "verdict": "incorrect",
+      "issues": "description is missing information from the \"explanatory information\" section and \"attached class10a buildings\" requirements",
+      "caption": "Figure 13.2.6: Insulation of slab edge",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:02:43+00:00"
+    },
+    "housing/figure-13.2.7b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 13.2.7b (explanatory): Floors of upper storeys of Class 1 buildings projecting beyond the external",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:03:04+00:00"
+    },
+    "housing/figure-2.2.3.png": {
+      "verdict": "incorrect",
+      "issues": "missing information from the three explanatory information sections",
+      "caption": "Figure 2.2.3: Wind regions",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:03:40+00:00"
+    },
+    "housing/figure-3.2.1b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 3.2.1b: Site cut and fill using un-retained embankments — Fill commencing at the allotment boundary or affecting an adjoining property",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:03:52+00:00"
+    },
+    "housing/figure-4.1.3c.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 4.1.3c: Footing and slab members and associated terminology: diagram 3",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:04:30+00:00"
+    },
+    "housing/figure-4.2.13.png": {
+      "verdict": "incorrect",
+      "issues": "description is missing information about section 4.2.14 and Table 4.2.14a and the table notes underneath",
+      "caption": "Figure 4.2.13: Pad footings for clad frame, Class A and S sites",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:05:42+00:00"
+    },
+    "housing/figure-4.2.15a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 4.2.15a: Strip footing systems for Class A and S sites",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:05:53+00:00"
+    },
+    "housing/figure-6.3.7.png": {
+      "verdict": "incorrect",
+      "issues": "description is missing details from section 6.3.8",
+      "caption": "Figure 6.3.7 (explanatory): Example of a 200 PFC bearer or lintel supporting floor or roof loads over a sin­ gle span",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:06:22+00:00"
+    },
+    "housing/figure-7.2.7f.png": {
+      "verdict": "incorrect",
+      "issues": "description is missing details from section 7.2.8",
+      "caption": "Figure 7.2.7f: Large penetrations using apron—typical roof penetration flashing details",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:07:44+00:00"
+    },
+    "housing/figure-9.3.4.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 9.3.4: Horizontal projection forming part of a separating wall",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:08:10+00:00"
+    },
+    "housing/figure-11.2.2e.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 11.2.2e: Spiral stairs — Measurement of openings in stairs",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:08:17+00:00"
+    },
+    "housing/figure-11.2.5a.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 11.2.5a: Landings",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:08:27+00:00"
+    },
+    "housing/figure-11.3.3b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 11.3.3b: Barriers — when required for retaining walls",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:08:50+00:00"
+    },
+    "housing/figure-3.3.3b.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 3.3.3b: Grading of ground under suspended floors",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-flash-latest",
+      "reviewed_at": "2026-10-25T11:09:02+00:00"
+    },
+    "housing/figure-3.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 3: Identification of defined flood level, flood hazard level and freeboard",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:09:36+00:00"
+    },
+    "housing/figure-7.2.6.png": {
+      "verdict": "correct",
+      "issues": "",
+      "caption": "Figure 7.2.6: Sheet laying sequence",
+      "corpus": "housing",
+      "doc": "ABCB Housing Provisions",
+      "model": "gemini-2.5-flash",
+      "reviewed_at": "2026-10-25T11:10:16+00:00"
+    }
+  },
+  "total": 90,
+  "reviewed": 90,
+  "correct": 82,
+  "incorrect": 8
+}
