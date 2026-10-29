@@ -167,3 +167,80 @@ def test_load_terms_failure_returns_empty_and_retries_next_call(monkeypatch):
 
     monkeypatch.setattr(glossary, "engine", _FakeEngine(rows=[("Habitable room", "A room.")]))
     assert glossary.load_terms() == {"Habitable room": "A room."}
+
+
+REQUEST_TERMS = {
+    "Accredited Testing Laboratory": "One of the following: (a) a NATA-accredited organisation.",
+    "Flashover": "The sudden spread of fire.",
+    "Going": "The horizontal dimension of a tread.",
+    "NATA": "National Association of Testing Authorities.",
+    "NCC": "National Construction Code.",
+    "Performance Requirement": "A requirement that states the level of performance.",
+}
+
+
+def test_ordinary_multi_word_terms_match_in_any_case():
+    glossary._set_terms(REQUEST_TERMS)
+
+    # The NCC capitalises every word; people type it in lowercase.
+    assert _terms(glossary.definitions_for([], "an accredited testing laboratory")) == ["Accredited Testing Laboratory"]
+    assert _terms(glossary.definitions_for([], "performance requirement")) == ["Performance Requirement"]
+
+
+def test_all_caps_terms_stay_case_sensitive():
+    glossary._set_terms(REQUEST_TERMS)
+
+    assert _terms(glossary.definitions_for([], "Who is NATA?")) == ["NATA"]
+    assert glossary.definitions_for([], "the nata of the matter") == []
+
+
+def test_is_abbreviation_separates_acronyms_from_capitalised_wording():
+    assert glossary._is_abbreviation("FRL")
+    assert glossary._is_abbreviation("AS")
+    assert glossary._is_abbreviation("NATA")
+    assert glossary._is_abbreviation("NCC")
+    assert not glossary._is_abbreviation("Accredited Testing Laboratory")
+    assert not glossary._is_abbreviation("Habitable room")
+    assert not glossary._is_abbreviation("U-Value")
+
+
+def test_definitions_for_request_answers_direct_definition_requests():
+    glossary._set_terms(REQUEST_TERMS)
+
+    for question in [
+        'What does the NCC mean by an "accredited testing laboratory"?',
+        "What is the definition of an accredited testing laboratory?",
+        "Define flashover.",
+        "What does flashover mean?",
+        "what is a flashover",
+        "What does 'performance requirement' mean?",
+    ]:
+        assert glossary.definitions_for_request(question), question
+
+
+def test_definitions_for_request_names_the_term_not_the_ncc():
+    glossary._set_terms(REQUEST_TERMS)
+
+    found = glossary.definitions_for_request('What does the NCC mean by an "accredited testing laboratory"?')
+
+    # "the NCC mean by ..." makes NCC the subject of "mean", not the term being defined.
+    assert _terms(found) == ["Accredited Testing Laboratory"]
+    assert _terms(glossary.definitions_for_request("What does NCC mean?")) == ["NCC"]
+
+
+def test_definitions_for_request_ignores_glossary_words_that_are_not_being_defined():
+    glossary._set_terms(REQUEST_TERMS)
+
+    for question in [
+        "What does clause H9Z7 of the NCC say?",
+        "What is the going rate for a builder in Sydney?",
+        "What does the going rate mean for builders?",
+        "Who is the Accredited Testing Laboratory for my windows?",
+        "What is the best way to cook a medium-rare steak?",
+        "Tell me about the Brisbane City Plan.",
+    ]:
+        assert glossary.definitions_for_request(question) == [], question
+
+
+def test_definitions_for_request_returns_nothing_when_glossary_is_empty():
+    assert glossary.definitions_for_request("What does flashover mean?") == []

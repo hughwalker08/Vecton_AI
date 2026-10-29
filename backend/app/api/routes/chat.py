@@ -34,6 +34,7 @@ retrieval.
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
@@ -43,7 +44,7 @@ from app.services.embedding import EmbeddingError
 from app.services.embedding import QuotaExceededError as EmbeddingQuotaExceeded
 from app.services.generation import NO_ANSWER_MARKER, GenerationError, condense_question, generate_answer
 from app.services.generation import QuotaExceededError as GenerationQuotaExceeded
-from app.services.glossary import definitions_for
+from app.services.glossary import definitions_for, definitions_for_request
 from app.services.retrieval import QuotaExceededError as RerankQuotaExceeded
 from app.services.retrieval import RerankError, retrieve
 
@@ -168,20 +169,37 @@ def _citations_from(chunks: list[dict]) -> list[Citation]:
 # quoted text can be opened and checked like any clause.
 _DEFINITIONS_DOC = "NCC Schedule 1 -- Definitions"
 _QUOTE_PROBE_CHARS = 40
+_LIST_LABEL = re.compile(r"^\s*(?:\(\w{1,4}\)|\d+[.)])\s*")
 
 
-def _squash(text: str) -> str:
-    return " ".join(text.split()).lower()
+def _flatten(text: str) -> str:
+    """Lower-case letters and digits only, so markdown, bullets, quote marks and
+    whitespace differences cannot hide a quotation."""
+    return re.sub(r"[^a-z0-9]+", "", text.lower())
+
+
+def _probe(definition: str) -> str:
+    """The opening words of a definition, flattened. Taken from the first line
+    with enough real text after dropping any "(a)" / "1." list label, because
+    a model often re-formats a lead-in such as "One of the following:" and
+    turns "(a) (b) (c)" into bullets."""
+    flat = ""
+    for line in definition.splitlines():
+        flat = _flatten(_LIST_LABEL.sub("", line))
+        if len(flat) >= 25:
+            return flat[:_QUOTE_PROBE_CHARS]
+    whole = _flatten(definition)
+    return whole[:_QUOTE_PROBE_CHARS] if len(whole) >= 12 else ""
 
 
 def _definition_citations(answer: str, definitions: list[dict]) -> list[Citation]:
-    """A Citation for each definition the answer quotes, i.e. whose opening
-    words appear in it. A term that merely shows up in the answer doesn't count."""
-    haystack = _squash(answer)
+    """A Citation for each definition the answer quotes, i.e. whose opening words
+    appear in it. A term that merely shows up in the answer doesn't count."""
+    haystack = _flatten(answer)
     citations = []
     for item in definitions:
         definition = (item.get("definition") or "").strip()
-        probe = _squash(definition)[:_QUOTE_PROBE_CHARS]
+        probe = _probe(definition)
         if probe and probe in haystack:
             citations.append(
                 Citation(clause_id=item["term"], doc=_DEFINITIONS_DOC, heading=item["term"], text=definition)
@@ -216,14 +234,21 @@ def ask_question(request: ChatRequest) -> ChatResponse:
     has_attachment = bool((request.attachment_text or "").strip())
     strong_match = bool(chunks) and chunks[0]["rerank_score"] >= MIN_RERANK_SCORE
 
-    if not strong_match and not has_attachment:
+    # A direct request to define a glossary term ("what does the NCC mean by an
+    # 'accredited testing laboratory'?") can be answered from the glossary even
+    # when no clause is a strong match -- glossary entries are never retrieved,
+    # and a term that no clause discusses cannot lift a clause over the cut-off.
+    asked_definitions = definitions_for_request(search_query) if not strong_match else []
+
+    if not strong_match and not has_attachment and not asked_definitions:
         return ChatResponse(answer="No source found.", citations=[], abstained=True)
 
     context_chunks = chunks if strong_match else []
     # Glossary entries never come back from retrieve(); the definitions the
     # context relies on are looked up here instead (see services/glossary.py).
-    # They're prompt-only: never chunks, so never citations either.
-    definitions = definitions_for(context_chunks, question) if context_chunks else []
+    # They are never chunks, so the only citation they can earn is the
+    # definition chip added in _definition_citations().
+    definitions = definitions_for(context_chunks, question) if context_chunks else asked_definitions
 
     try:
         answer = generate_answer(

@@ -46,15 +46,25 @@ _terms: dict[str, str] | None = None
 _patterns: list[tuple[str, re.Pattern]] = []
 
 
+def _is_abbreviation(term: str) -> bool:
+    """A symbol, short code or acronym: <= 3 characters, or containing an
+    all-capitals word ("NATA", "FRL", "AS"). Anything else is ordinary
+    wording, including multi-word terms that merely capitalise each word
+    ("Accredited Testing Laboratory", "Performance Requirement")."""
+    if len(term) <= 3:
+        return True
+    return any(len(word) > 1 and word.isupper() for word in re.findall(r"[A-Za-z0-9]+", term))
+
+
 def _matcher(term: str) -> re.Pattern:
     """Whole-word pattern for spotting `term` in a question.
 
     Abbreviations and short symbols ("AS", "FRL", "mm") are matched
     case-sensitively, or "as" and "frl" would match ordinary words.
-    Ordinary terms ("Habitable room") match in any case.
+    Ordinary terms match in any case: people type "accredited testing
+    laboratory" in lowercase, and the NCC capitalises it.
     """
-    abbreviation = len(term) <= 3 or term[1:] != term[1:].lower()
-    flags = 0 if abbreviation else re.IGNORECASE
+    flags = 0 if _is_abbreviation(term) else re.IGNORECASE
     return re.compile(rf"(?<!\w){re.escape(term)}(?!\w)", flags)
 
 
@@ -122,3 +132,47 @@ def definitions_for(chunks: list[dict], question: str = "") -> list[dict]:
         if len(definitions) >= MAX_DEFINITIONS:
             break
     return definitions
+
+
+_QUOTES = re.compile(r"[\"'\u2018\u2019\u201c\u201d]")
+# "... mean(s) [by|of|as] [a|an|the] <term>" / "definition of <term>" / "define <term>"
+_CUE_BEFORE = re.compile(
+    r"\b(?:means?|meant|meaning|definition|define|defined)\b(?:\s+(?:by|of|as|for))?\s+(?:an?|the)?\s*$",
+    re.IGNORECASE,
+)
+# "what is [a|an|the] <term>" with the term ending the question
+_WHAT_IS_BEFORE = re.compile(r"^\s*(?:what|which)\s+(?:is|are)\s+(?:an?|the)?\s*$", re.IGNORECASE)
+# "<term> mean(s)" / "<term> stand(s) for" / "<term> defined"
+_CUE_AFTER = re.compile(r"^\W*(?:means?|meaning|defined|stands?\s+for)\b", re.IGNORECASE)
+# "the NCC mean(s) by ..." -- here the term is the subject of "mean", not what is being defined
+_SUBJECT_OF_MEAN = re.compile(r"^\W*means?\s+(?:by|of)\b", re.IGNORECASE)
+
+
+def definitions_for_request(question: str) -> list[dict]:
+    """Definitions for the glossary terms `question` explicitly asks about.
+
+    Used when retrieval found no clause strong enough to answer from: a
+    definition request such as 'What does the NCC mean by an "accredited
+    testing laboratory"?' can still be answered from the glossary, even when
+    no clause discusses the term. Only a direct request counts ("mean by X",
+    "definition of X", "X mean", "what is X?"): a glossary word that merely
+    appears in an unrelated question ("What does clause H9Z7 of the NCC say?")
+    must not turn a decline into an answer.
+    """
+    terms = load_terms()
+    if not terms:
+        return []
+    found: list[str] = []
+    for term, pattern in _patterns:
+        for match in pattern.finditer(question):
+            before = _QUOTES.sub("", question[: match.start()])
+            after = _QUOTES.sub("", question[match.end():])
+            asks = (
+                _CUE_BEFORE.search(before)
+                or (_CUE_AFTER.match(after) and not _SUBJECT_OF_MEAN.match(after))
+                or (_WHAT_IS_BEFORE.match(before) and re.fullmatch(r"[\W_]*", after))
+            )
+            if asks and term not in found:
+                found.append(term)
+                break
+    return [{"term": t, "definition": terms[t]} for t in found if terms.get(t)][:MAX_DEFINITIONS]

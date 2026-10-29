@@ -97,7 +97,8 @@ without a source: not "as a general principle", not "typically", not as helpful 
 CONTEXT may be followed by DEFINITIONS: NCC Schedule 1 definitions of terms the clauses or the \
 question use. Use them to interpret the clauses, since a defined term carries that meaning \
 rather than its everyday one. When a definition matters to the answer, attribute it as an NCC \
-Schedule 1 definition of that term rather than as a clause.
+Schedule 1 definition of that term rather than as a clause. If the question asks what a term \
+means and DEFINITIONS gives it, answer from that definition even when CONTEXT is empty.
 
 Be simple, clear and concise.
 
