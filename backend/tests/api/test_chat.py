@@ -556,3 +556,86 @@ def test_ask_question_adds_a_chip_for_a_quoted_definition(client, monkeypatch):
     body = client.post("/api/chat/", json={"question": "Footings?", "jurisdiction": "NSW"}).json()
 
     assert [c["clause_id"] for c in body["citations"]] == ["H1D4", "Footing"]
+
+
+_ATL = {
+    "term": "Accredited Testing Laboratory",
+    "definition": "One of the following: (a) a NATA-accredited organisation.",
+}
+
+
+def test_ask_question_answers_a_definition_request_when_no_clause_is_a_strong_match(client, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [_chunk(rerank_score=0.07)])
+    monkeypatch.setattr(chat, "definitions_for_request", lambda q: [_ATL])
+
+    def fake_generate(question, chunks, **kwargs):
+        seen["chunks"], seen["definitions"] = chunks, kwargs.get("definitions")
+        return "One of the following: (a) a NATA-accredited organisation."
+
+    monkeypatch.setattr(chat, "generate_answer", fake_generate)
+
+    question = 'What does the NCC mean by an "accredited testing laboratory"?'
+    body = client.post("/api/chat/", json={"question": question, "jurisdiction": "NSW"}).json()
+
+    assert body["abstained"] is False
+    assert seen["chunks"] == []  # the weak clause is not passed off as context
+    assert seen["definitions"] == [_ATL]
+    # no clause chip, only the definition chip for the text the answer quotes
+    assert [c["clause_id"] for c in body["citations"]] == ["Accredited Testing Laboratory"]
+
+
+def test_ask_question_still_abstains_when_weak_and_not_a_definition_request(client, monkeypatch):
+    monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [_chunk(rerank_score=0.07)])
+    monkeypatch.setattr(chat, "definitions_for_request", lambda q: [])
+
+    def must_not_generate(*args, **kwargs):
+        raise AssertionError("must not be called")
+
+    monkeypatch.setattr(chat, "generate_answer", must_not_generate)
+
+    question = "What does clause H9Z7 of the NCC say?"
+    body = client.post("/api/chat/", json={"question": question, "jurisdiction": "NSW"}).json()
+
+    assert body["abstained"] is True
+    assert body["answer"] == "No source found."
+    assert body["citations"] == []
+
+
+def test_ask_question_looks_up_definition_requests_only_when_retrieval_is_weak(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(chat, "retrieve", lambda *a, **k: [_chunk(rerank_score=0.95)])
+    monkeypatch.setattr(chat, "definitions_for_request", lambda q: calls.append(q) or [])
+    monkeypatch.setattr(chat, "generate_answer", lambda *a, **k: "ok")
+
+    client.post("/api/chat/", json={"question": "Footings?", "jurisdiction": "NSW"})
+
+    assert calls == []
+
+
+def test_definition_citations_survive_markdown_and_list_labels():
+    definitions = [
+        {
+            "term": "Accredited Testing Laboratory",
+            "definition": (
+                "One of the following:\n(a) An organisation accredited by NATA to undertake the relevant tests.\n"
+                "(b) An overseas organisation."
+            ),
+        },
+    ]
+    # The model dropped "(a)" / "(b)" and used bullets instead.
+    answer = (
+        "An **Accredited Testing Laboratory** is one of the following:\n\n"
+        "- An organisation accredited by NATA to undertake the relevant tests.\n"
+        "- An overseas organisation."
+    )
+
+    citations = chat._definition_citations(answer, definitions)
+
+    assert [c.clause_id for c in citations] == ["Accredited Testing Laboratory"]
+
+
+def test_definition_citations_do_not_fire_on_a_paraphrase_of_other_words():
+    definitions = [{"term": "Going", "definition": "The horizontal dimension from the front to the back of a tread."}]
+
+    assert chat._definition_citations("The going rate for a builder is high.", definitions) == []
